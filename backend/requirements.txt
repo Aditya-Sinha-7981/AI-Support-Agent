@@ -1,0 +1,25 @@
+# Backend framework
+fastapi
+uvicorn[standard]
+python-multipart
+websockets
+python-dotenv
+pydantic-settings
+
+# RAG — direct libraries, no llama-index
+faiss-cpu
+pypdf
+
+# LLM + Embeddings
+google-generativeai
+groq
+
+# STT
+faster-whisper
+
+# TTS
+edge-tts
+
+# HTTP
+httpx
+aiofiles

@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Environment — NEVER commit real keys
+.env
+
+# FAISS indexes — auto-generated, no need to commit
+backend/data/indexes/
+
+# Personal AI logs — never commit these
+logs/
+*.local.md
+
+# Node
+node_modules/
+dist/
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
