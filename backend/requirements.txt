@@ -11,7 +11,7 @@ faiss-cpu
 pypdf
 
 # LLM + Embeddings
-google-generativeai
+google-genai
 groq
 
 # STT
