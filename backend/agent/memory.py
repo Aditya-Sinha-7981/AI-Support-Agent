@@ -1,17 +1,22 @@
-# Owner: M3
-# Simple in-memory conversation history per session
+from collections import deque
 
-from typing import List, Dict
+# Store all sessions here
+sessions = {}
 
-_sessions: Dict[str, List[Dict]] = {}
+def get_history(session_id: str, max_turns: int = 8):
+    """
+    Returns last few messages of a session
+    """
+    return list(sessions.get(session_id, deque(maxlen=max_turns)))
 
-def get_history(session_id: str) -> List[Dict]:
-    return _sessions.get(session_id, [])
+def add_turn(session_id: str, role: str, content: str):
+    """
+    Add a message to session history
+    """
+    if session_id not in sessions:
+        sessions[session_id] = deque(maxlen=16)
 
-def add_turn(session_id: str, role: str, content: str) -> None:
-    if session_id not in _sessions:
-        _sessions[session_id] = []
-    _sessions[session_id].append({"role": role, "content": content})
-
-def clear(session_id: str) -> None:
-    _sessions[session_id] = []
+    sessions[session_id].append({
+        "role": role,
+        "content": content
+    })
