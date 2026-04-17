@@ -359,9 +359,9 @@ Follow these rules without exception. They prevent 90% of cross-platform bugs.
 | Rule | Why |
 |---|---|
 | Use `pathlib.Path` for ALL file paths, never string concatenation | Windows uses `\`, Mac uses `/` |
-| Everyone uses **Python 3.11** exactly | Avoids subtle dependency conflicts |
+| Everyone uses **Python 3.11 or 3.12+** | 3.11 preferred, 3.12/3.13 fine since llama-index removed |
 | Everyone uses a **virtual environment** (`venv`) | No global pip installs |
-| `requirements.txt` has **pinned versions** (e.g. `fastapi==0.111.0`) | Same env everywhere |
+| `requirements.txt` has **unpinned versions** (llama-index removed, no conflict risk) | Installs cleanly on all Python 3.11+ |
 | Audio capture happens in the **browser JS**, not Python | Avoids pyaudio/sounddevice platform hell |
 | faster-whisper always uses `device="cpu", compute_type="int8"` | GPU acceleration differs per platform |
 | `.env` file: **no spaces around `=`**, no quotes unless needed | Windows dotenv parsing is stricter |
@@ -391,34 +391,35 @@ cp .env.example .env
 
 ## 📦 Dependencies (`requirements.txt`)
 
+> **Note:** llama-index was removed due to Python 3.12+ incompatibility. RAG is implemented
+> directly using `faiss-cpu`, `pypdf`, and `google-generativeai` for embeddings. No functionality lost.
+
 ```
 # Backend framework
-fastapi==0.111.0
-uvicorn[standard]==0.29.0
-python-multipart==0.0.9
-websockets==12.0
-python-dotenv==1.0.1
+fastapi
+uvicorn[standard]
+python-multipart
+websockets
+python-dotenv
+pydantic-settings
 
-# RAG
-llama-index==0.10.40
-faiss-cpu==1.8.0
+# RAG — direct libraries, no llama-index wrapper
+faiss-cpu
+pypdf
 
-# LLM providers
-google-generativeai==0.7.2
-groq==0.9.0
-
-# Embeddings (via LlamaIndex + Gemini)
-llama-index-embeddings-gemini==0.1.7
+# LLM + Embeddings (Gemini SDK handles both)
+google-generativeai
+groq
 
 # STT
-faster-whisper==1.0.1
+faster-whisper
 
 # TTS
-edge-tts==6.1.10
+edge-tts
 
 # HTTP
-httpx==0.27.0
-aiofiles==23.2.1
+httpx
+aiofiles
 ```
 
 Frontend (`package.json` key deps):
