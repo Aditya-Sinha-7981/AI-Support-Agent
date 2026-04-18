@@ -1,61 +1,95 @@
-import asyncio
-from fastapi import APIRouter, WebSocket
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
 from agent.memory import get_history, add_turn
-from agent.sentiment import detect_sentiment
+
+# -----------------------------
+# ✅ DUMMY PIPELINE (TEMP)
+# -----------------------------
+class DummyPipeline:
+    def __init__(self):
+        self.last_sources = [{"file": "demo.pdf", "page": 1}]
+        self.last_sentiment = "neutral"
+
+    async def query(self, message, domain, history):
+        response = f"Dummy response for {domain}"
+
+        for word in response.split():
+            yield word + " "
+
+        # simulate updated metadata
+        self.last_sources = [{"file": f"{domain}.pdf", "page": 2}]
+        self.last_sentiment = "neutral"
+
+
+pipeline = DummyPipeline()
+
 
 router = APIRouter()
+
+VALID_DOMAINS = {"banking", "ecommerce"}
 
 @router.websocket("/ws/chat/{session_id}")
 async def chat(websocket: WebSocket, session_id: str):
     await websocket.accept()
 
-    while True:
-        try:
-            # 1. receive message
+    try:
+        while True:
             data = await websocket.receive_json()
-            message = data.get("message", "")
+            message = data.get("message", "").strip()
 
-            # 2. get history
+            # -----------------------------
+            # 1. Domain handling
+            # -----------------------------
+            domain = websocket.query_params.get("domain", "banking")
+            if domain not in VALID_DOMAINS:
+                domain = "banking"
+
+            # -----------------------------
+            # 2. Memory (before pipeline)
+            # -----------------------------
             history = get_history(session_id)
+            add_turn(session_id, "user", message)
 
-            # 3. detect sentiment
-            sentiment = await detect_sentiment(message)
+            # -----------------------------
+            # 3. Pipeline call
+            # -----------------------------
+            full_response = ""
 
-            # 4. build response
-            full_response = f"You said: {message} | History count: {len(history)}"
-
-            collected = ""
-
-            # 5. stream tokens
-            for word in full_response.split():
-                token = word + " "
-                collected += token
+            async for token in pipeline.query(message, domain, history):
+                full_response += token
 
                 await websocket.send_json({
                     "type": "token",
                     "content": token
                 })
 
-                await asyncio.sleep(0.1)
-
-            # 6. send sentiment
+            # -----------------------------
+            # 4. SEND SOURCES
+            # -----------------------------
             await websocket.send_json({
-                "type": "sentiment",
-                "content": sentiment
+                "type": "sources",
+                "content": pipeline.last_sources
             })
 
-            # 7. send done
+            # -----------------------------
+            # 5. SEND SENTIMENT
+            # -----------------------------
+            await websocket.send_json({
+                "type": "sentiment",
+                "content": pipeline.last_sentiment
+            })
+
+            # -----------------------------
+            # 6. SEND DONE
+            # -----------------------------
             await websocket.send_json({
                 "type": "done"
             })
 
-            # 8. save memory
-            add_turn(session_id, "user", message)
-            add_turn(session_id, "assistant", collected)
+            # -----------------------------
+            # 7. Save assistant response
+            # -----------------------------
+            add_turn(session_id, "assistant", full_response)
 
-        except Exception as e:
-            await websocket.send_json({
-                "type": "error",
-                "content": str(e)
-            })
-            break
+    except WebSocketDisconnect:
+        pass

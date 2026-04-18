@@ -1,6 +1,6 @@
 from collections import deque
 
-# Store all sessions here
+# Store all sessions
 sessions = {}
 
 def get_history(session_id: str, max_turns: int = 8):
@@ -20,3 +20,10 @@ def add_turn(session_id: str, role: str, content: str):
         "role": role,
         "content": content
     })
+
+def clear(session_id: str):
+    """
+    Clear all conversation history for a session
+    """
+    if session_id in sessions:
+        del sessions[session_id]
