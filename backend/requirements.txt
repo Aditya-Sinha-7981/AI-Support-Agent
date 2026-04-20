@@ -7,6 +7,7 @@ python-dotenv
 pydantic-settings
 
 # RAG — direct libraries, no llama-index
+numpy
 faiss-cpu
 pypdf
 
