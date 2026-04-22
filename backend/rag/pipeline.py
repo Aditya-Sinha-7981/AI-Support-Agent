@@ -125,7 +125,6 @@ class RAGPipeline:
         self.last_sentiment = await detect_sentiment(message)
 
         retriever = _get_retriever(domain)
-        llm = get_llm_provider()
 
         if not retriever.is_available():
             notice = (
@@ -136,6 +135,7 @@ class RAGPipeline:
                 yield token
             return
 
+        llm = get_llm_provider()
         hits = await retriever.search(message.strip(), k=4)
         if hits:
             self.last_sources = _sources_from_hits(hits)
