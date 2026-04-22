@@ -5,7 +5,7 @@ from api.voice import router as voice_router
 from api.chat import router as chat_router
 
 
-app = FastAPI()
+app = FastAPI(title="AI Support Agent API")
 
 # Allow frontend to connect (important later)
 app.add_middleware(
@@ -22,4 +22,9 @@ app.include_router(chat_router)
 
 @app.get("/")
 def home():
-    return {"message": "hello"}
+    return {"message": "AI Support Agent backend is running."}
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
