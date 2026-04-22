@@ -1,0 +1,9 @@
+# Sample banking knowledge (development)
+
+## Savings accounts
+The minimum opening deposit for an Everyday Savings account is 500 US dollars.
+Customers must provide a government-issued photo ID and proof of address dated within the last 90 days.
+
+## Wire transfers
+Domestic wire transfer requests received before 2:00 PM Eastern Time on a business day
+are typically processed the same day. International wires may take two to five business days.

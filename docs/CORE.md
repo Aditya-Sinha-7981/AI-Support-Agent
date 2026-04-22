@@ -40,6 +40,9 @@ Every external service in this project is **swappable via a single `.env` variab
 # LLM
 LLM_PROVIDER=gemini          # options: gemini | groq
 
+# RAG embeddings (Gemini — required for ingest + retrieval)
+GEMINI_EMBEDDING_MODEL=gemini-embedding-001
+
 # Speech to Text
 STT_PROVIDER=local            # options: local | deepgram
 
@@ -59,8 +62,8 @@ ELEVENLABS_API_KEY=your_key_here
 
 | Service | Primary (Free/Always) | Fallback (Credits/Premium) | Notes |
 |---|---|---|---|
-| **LLM** | Gemini 2.0 Flash | Groq (Llama 3.3 70B) | Both free, Groq is faster |
-| **Embeddings** | Gemini text-embedding-004 | — | Free, no fallback needed |
+| **LLM** | Gemini (configured via `GEMINI_MODEL`) | Groq (Llama 3.3 70B) | Both free, Groq is faster |
+| **Embeddings** | Gemini `gemini-embedding-001` (default, configurable) | — | Uses `GEMINI_EMBEDDING_MODEL` from `.env` |
 | **STT** | faster-whisper (local) | Deepgram Nova-2 | Local = free always, Deepgram = $200 credit |
 | **TTS** | edge-tts (free) | ElevenLabs | edge-tts has no limits at all |
 | **Vector DB** | FAISS (local) | — | Free, no infra needed |
@@ -210,7 +213,7 @@ Same exact pattern for LLM and TTS. The rest of the app just calls `get_stt_prov
 ```
 Load documents (PDF / TXT)
     → Split into chunks (512 tokens, 50 token overlap)
-    → Embed each chunk using Gemini text-embedding-004
+    → Embed each chunk using Gemini model from `.env` (`GEMINI_EMBEDDING_MODEL`)
     → Store embeddings + metadata in FAISS index
     → Save index to disk at data/indexes/{domain}/
 ```
@@ -230,6 +233,8 @@ User query
 - Always save the FAISS index to disk after ingestion (`faiss.write_index()`). If you don't, it resets every time the server restarts.
 - Use `pathlib.Path` for all file paths — this is what makes it work on both Mac and Windows without changes.
 - Chunk size 512 tokens with 50 overlap is a safe default. Don't over-tune this early.
+- After adding docs, run `python scripts/ingest_domain.py banking` (or `ecommerce`) from `backend/`.
+- `backend/data/indexes/` is gitignored, so every teammate must ingest locally after pulling.
 
 ---
 
@@ -259,20 +264,9 @@ The last 8 turns are injected into every LLM prompt. This is what gives the bot 
 
 ### 4. Sentiment Detection
 
-One extra LLM call per user message. Lightweight, fast.
-
-```python
-# agent/sentiment.py
-async def detect_sentiment(user_message: str, llm) -> str:
-    prompt = f"""
-    Classify the sentiment of this customer message in one word only.
-    Choose from: positive, neutral, frustrated, urgent
-    Message: "{user_message}"
-    Respond with one word only.
-    """
-    result = await llm.complete(prompt)
-    return result.strip().lower()  # returns "positive" | "neutral" | "frustrated" | "urgent"
-```
+Current implementation uses a lightweight rule/keyword classifier in `agent/sentiment.py`.
+It returns API-contract-aligned values: `positive`, `neutral`, or `frustrated`.
+This keeps latency/cost low and can be swapped to an LLM classifier later without changing WebSocket shapes.
 
 This result is:
 1. Sent to the frontend to display the sentiment badge
@@ -392,7 +386,7 @@ cp .env.example .env
 ## 📦 Dependencies (`requirements.txt`)
 
 > **Note:** llama-index was removed due to Python 3.12+ incompatibility. RAG is implemented
-> directly using `faiss-cpu`, `pypdf`, and `google-generativeai` for embeddings. No functionality lost.
+> directly using `faiss-cpu`, `pypdf`, `numpy`, and `google-genai` for Gemini chat + embeddings. No functionality lost.
 
 ```
 # Backend framework
@@ -404,11 +398,12 @@ python-dotenv
 pydantic-settings
 
 # RAG — direct libraries, no llama-index wrapper
+numpy
 faiss-cpu
 pypdf
 
 # LLM + Embeddings (Gemini SDK handles both)
-google-generativeai
+google-genai
 groq
 
 # STT
