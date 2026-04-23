@@ -18,6 +18,25 @@ export function useWebSocket({ domain, sessionId }) {
   const [connectionState, setConnectionState] = useState("connecting");
   const [sentiment, setSentiment] = useState("neutral");
 
+  const finalizePendingAssistantTurn = useCallback((fallbackText = "") => {
+    const pendingId = pendingAssistantIdRef.current;
+    if (!pendingId) return;
+
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.id === pendingId
+          ? {
+              ...message,
+              content: message.content || fallbackText,
+              isStreaming: false,
+              isComplete: true
+            }
+          : message
+      )
+    );
+    pendingAssistantIdRef.current = null;
+  }, []);
+
   const connect = useCallback(() => {
     const ws = new WebSocket(buildChatWsUrl(sessionId, domain));
     wsRef.current = ws;
@@ -28,10 +47,12 @@ export function useWebSocket({ domain, sessionId }) {
     };
 
     ws.onclose = () => {
+      finalizePendingAssistantTurn("Connection closed before response completed. Please retry.");
       setConnectionState("closed");
     };
 
     ws.onerror = () => {
+      finalizePendingAssistantTurn("Connection error while generating response. Please retry.");
       setConnectionState("error");
     };
 
@@ -84,21 +105,10 @@ export function useWebSocket({ domain, sessionId }) {
       }
 
       if (payload.type === "done") {
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.id === pendingAssistantIdRef.current
-              ? {
-                  ...message,
-                  isStreaming: false,
-                  isComplete: true
-                }
-              : message
-          )
-        );
-        pendingAssistantIdRef.current = null;
+        finalizePendingAssistantTurn();
       }
     };
-  }, [domain, sessionId]);
+  }, [domain, sessionId, finalizePendingAssistantTurn]);
 
   const resetConversation = useCallback(() => {
     conversationCacheRef.current.delete(activeConversationKey);
@@ -138,7 +148,12 @@ export function useWebSocket({ domain, sessionId }) {
 
   const sendMessage = useCallback((text) => {
     const trimmed = text.trim();
-    if (!trimmed || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+    if (
+      !trimmed ||
+      !wsRef.current ||
+      wsRef.current.readyState !== WebSocket.OPEN ||
+      pendingAssistantIdRef.current
+    ) {
       return false;
     }
 

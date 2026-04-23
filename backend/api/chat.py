@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from agent.memory import add_turn, clear, get_history
@@ -5,6 +7,7 @@ from agent.router import route
 from rag.pipeline import pipeline
 
 router = APIRouter()
+logger = logging.getLogger("ai_support.chat")
 
 VALID_DOMAINS = {"banking", "ecommerce"}
 _session_domains: dict[str, str] = {}
@@ -21,11 +24,18 @@ async def _send_turn_end(
 @router.websocket("/ws/chat/{session_id}")
 async def chat(websocket: WebSocket, session_id: str):
     await websocket.accept()
+    logger.info("WS connected session=%s", session_id)
 
     try:
         while True:
             data = await websocket.receive_json()
             message = data.get("message", "").strip()
+            logger.info(
+                "WS recv session=%s chars=%d text=%r",
+                session_id,
+                len(message),
+                message[:180],
+            )
             if not message:
                 await websocket.send_json(
                     {"type": "token", "content": "Please send a non-empty message."}
@@ -37,12 +47,14 @@ async def chat(websocket: WebSocket, session_id: str):
             domain = websocket.query_params.get("domain", "banking")
             if domain not in VALID_DOMAINS:
                 domain = "banking"
+            logger.info("WS domain session=%s domain=%s", session_id, domain)
             last_domain = _session_domains.get(session_id)
             if last_domain and last_domain != domain:
                 clear(session_id)
             _session_domains[session_id] = domain
 
             target = route(message)
+            logger.info("WS route session=%s target=%s", session_id, target)
             if target == "empty":
                 await websocket.send_json(
                     {"type": "token", "content": "Please send a non-empty message."}
@@ -66,9 +78,11 @@ async def chat(websocket: WebSocket, session_id: str):
 
             # 3. Pipeline call
             full_response = ""
+            token_count = 0
             try:
                 async for token in pipeline.query(message, domain, history):
                     full_response += token
+                    token_count += 1
 
                     await websocket.send_json({
                         "type": "token",
@@ -81,12 +95,34 @@ async def chat(websocket: WebSocket, session_id: str):
                     sources=pipeline.last_sources,
                     sentiment=pipeline.last_sentiment,
                 )
-            except Exception:  # noqa: BLE001
-                fallback = (
-                    "I could not process that request right now. "
-                    "Please verify backend setup and try again."
+                logger.info(
+                    "WS done session=%s tokens=%d resp_chars=%d sentiment=%s sources=%s preview=%r",
+                    session_id,
+                    token_count,
+                    len(full_response),
+                    pipeline.last_sentiment,
+                    pipeline.last_sources,
+                    full_response[:220],
                 )
+            except Exception as exc:  # noqa: BLE001
+                err = str(exc).lower()
+                if "quota" in err or "429" in err:
+                    fallback = (
+                        "I am temporarily rate-limited right now. "
+                        "Please try again in a moment."
+                    )
+                elif "unavailable" in err or "503" in err or "high demand" in err:
+                    fallback = (
+                        "The AI model is under high demand right now. "
+                        "Please retry in a few seconds."
+                    )
+                else:
+                    fallback = (
+                        "I could not process that request right now. "
+                        "Please verify backend setup and try again."
+                    )
                 full_response = fallback
+                logger.exception("WS pipeline failure session=%s", session_id)
                 await websocket.send_json({"type": "token", "content": fallback})
                 await _send_turn_end(websocket)
 
@@ -94,3 +130,4 @@ async def chat(websocket: WebSocket, session_id: str):
 
     except WebSocketDisconnect:
         _session_domains.pop(session_id, None)
+        logger.info("WS disconnected session=%s", session_id)
