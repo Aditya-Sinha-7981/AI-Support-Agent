@@ -1,11 +1,19 @@
+from __future__ import annotations
+
+import edge_tts
+
 from .base import BaseTTS
 
 
 class EdgeTTSProvider(BaseTTS):
-    """
-    Placeholder implementation for Phase 1.
-    Real edge-tts integration will be completed in TTS phase.
-    """
-
     async def synthesize(self, text: str) -> bytes:
-        return b""
+        text = (text or "").strip()
+        if not text:
+            return b""
+
+        communicate = edge_tts.Communicate(text=text, voice="en-US-JennyNeural")
+        audio = bytearray()
+        async for chunk in communicate.stream():
+            if chunk.get("type") == "audio" and chunk.get("data"):
+                audio.extend(chunk["data"])
+        return bytes(audio)

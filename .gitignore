@@ -25,3 +25,5 @@ dist/
 .vscode/
 .idea/
 *.swp
+backend/.hf/
+backend/.hf/
