@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import AsyncGenerator
 
 from agent.sentiment import detect_sentiment
@@ -16,6 +17,7 @@ _DOMAIN_LABEL = {
 }
 
 _retrievers: dict[str, Retriever] = {}
+logger = logging.getLogger("ai_support.pipeline")
 
 
 def _get_retriever(domain: str) -> Retriever:
@@ -123,10 +125,18 @@ class RAGPipeline:
         domain = _normalize_domain(domain)
         self.last_sources = []
         self.last_sentiment = await detect_sentiment(message)
+        logger.info(
+            "RAG start domain=%s sentiment=%s msg_chars=%d history_turns=%d",
+            domain,
+            self.last_sentiment,
+            len(message or ""),
+            len(history or []),
+        )
 
         retriever = _get_retriever(domain)
 
         if not retriever.is_available():
+            logger.warning("RAG index unavailable domain=%s", domain)
             notice = (
                 "The knowledge base for this domain is not loaded yet. "
                 "Please run ingestion (see backend/scripts/ingest_domain.py) and try again."
@@ -137,6 +147,7 @@ class RAGPipeline:
 
         llm = get_llm_provider()
         hits = await retriever.search(message.strip(), k=4)
+        logger.info("RAG retrieved domain=%s hits=%d", domain, len(hits))
         if hits:
             self.last_sources = _sources_from_hits(hits)
         blocks = [h.get("text", "").strip() for h in hits if h.get("text")]
@@ -147,9 +158,13 @@ class RAGPipeline:
             context_blocks=blocks,
             sentiment=self.last_sentiment,
         )
+        logger.info("RAG prompt domain=%s prompt_chars=%d", domain, len(prompt))
 
+        stream_token_count = 0
         async for token in llm.stream(prompt):
+            stream_token_count += 1
             yield token
+        logger.info("RAG stream complete domain=%s tokens=%d", domain, stream_token_count)
 
 
 # Singleton — import and use this instance everywhere
