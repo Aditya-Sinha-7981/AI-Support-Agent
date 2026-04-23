@@ -1,0 +1,245 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import ChatWindow from "./components/ChatWindow";
+import DomainSwitcher from "./components/DomainSwitcher";
+import SentimentBadge from "./components/SentimentBadge";
+import VoiceInput from "./components/VoiceInput";
+import { useWebSocket } from "./hooks/useWebSocket";
+
+function makeSessionId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+export default function App() {
+  const [domain, setDomain] = useState("banking");
+  const [chatState, setChatState] = useState(() => {
+    const bankingId = makeSessionId();
+    const ecommerceId = makeSessionId();
+    const now = Date.now();
+    return {
+      activeSessionByDomain: {
+        banking: bankingId,
+        ecommerce: ecommerceId
+      },
+      threadsByDomain: {
+        banking: [{ id: bankingId, title: "Banking Chat 1", updatedAt: now }],
+        ecommerce: [{ id: ecommerceId, title: "Ecommerce Chat 1", updatedAt: now }]
+      }
+    };
+  });
+  const [draft, setDraft] = useState("");
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const voiceSubmitTimerRef = useRef(null);
+  const activeSessionId = chatState.activeSessionByDomain[domain];
+  const activeThreads = chatState.threadsByDomain[domain];
+
+  const { messages, sentiment, connectionState, sendMessage } = useWebSocket({ domain, sessionId: activeSessionId });
+
+  const connectionText = useMemo(() => {
+    if (connectionState === "open") return "Connected";
+    if (connectionState === "connecting") return "Connecting...";
+    if (connectionState === "error") return "Connection error";
+    return "Disconnected";
+  }, [connectionState]);
+
+  const updateActiveThreadDetails = (messageText) => {
+    const trimmed = messageText.trim();
+    if (!trimmed) return;
+
+    setChatState((prev) => {
+      const currentDomainThreads = prev.threadsByDomain[domain];
+      const updatedThreads = currentDomainThreads.map((thread) => {
+        if (thread.id !== prev.activeSessionByDomain[domain]) return thread;
+        const isDefaultTitle = thread.title.toLowerCase().includes("chat ");
+        return {
+          ...thread,
+          title: isDefaultTitle ? trimmed.slice(0, 32) : thread.title,
+          updatedAt: Date.now()
+        };
+      });
+
+      return {
+        ...prev,
+        threadsByDomain: {
+          ...prev.threadsByDomain,
+          [domain]: updatedThreads.sort((a, b) => b.updatedAt - a.updatedAt)
+        }
+      };
+    });
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const sent = sendMessage(draft);
+    if (sent) {
+      updateActiveThreadDetails(draft);
+      setDraft("");
+    }
+  };
+
+  const handleDomainSwitch = (nextDomain) => {
+    if (nextDomain === domain) return;
+    setDomain(nextDomain);
+    setDraft("");
+  };
+
+  const handleNewChat = () => {
+    const newSessionId = makeSessionId();
+    setChatState((prev) => {
+      const nextIndex = prev.threadsByDomain[domain].length + 1;
+      return {
+        activeSessionByDomain: {
+          ...prev.activeSessionByDomain,
+          [domain]: newSessionId
+        },
+        threadsByDomain: {
+          ...prev.threadsByDomain,
+          [domain]: [
+            { id: newSessionId, title: `${domain === "banking" ? "Banking" : "Ecommerce"} Chat ${nextIndex}`, updatedAt: Date.now() },
+            ...prev.threadsByDomain[domain]
+          ]
+        }
+      };
+    });
+    setDraft("");
+  };
+
+  const handleSelectChat = (sessionId) => {
+    setChatState((prev) => ({
+      ...prev,
+      activeSessionByDomain: {
+        ...prev.activeSessionByDomain,
+        [domain]: sessionId
+      }
+    }));
+    setDraft("");
+  };
+
+  const handleVoiceTranscript = (transcript) => {
+    setDraft(transcript);
+    if (voiceSubmitTimerRef.current) {
+      window.clearTimeout(voiceSubmitTimerRef.current);
+    }
+    voiceSubmitTimerRef.current = window.setTimeout(() => {
+      const sent = sendMessage(transcript);
+      if (sent) {
+        updateActiveThreadDetails(transcript);
+        setDraft("");
+      }
+    }, 250);
+  };
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDarkMode);
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem("theme");
+    if (savedTheme === "light") {
+      setIsDarkMode(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("theme", isDarkMode ? "dark" : "light");
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    return () => {
+      if (voiceSubmitTimerRef.current) {
+        window.clearTimeout(voiceSubmitTimerRef.current);
+      }
+    };
+  }, []);
+
+  return (
+    <div className="mx-auto flex h-screen max-w-6xl p-3 text-slate-900 dark:text-[#dbdee1] md:p-5">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-sm backdrop-blur dark:border-[#1e1f22] dark:bg-[#2b2d31]">
+          <div className="flex items-center gap-3">
+            <div>
+              <p className="text-lg font-bold tracking-tight">AI Support Agent</p>
+              <p className="text-xs text-slate-500 dark:text-[#b5bac1]">
+                Real-time support chat for {domain}
+              </p>
+            </div>
+          </div>
+
+          <DomainSwitcher activeDomain={domain} onSwitch={handleDomainSwitch} />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleNewChat}
+              className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 dark:bg-[#5865f2] dark:hover:bg-[#4752c4]"
+            >
+              <span>+</span>
+              <span>New {domain === "banking" ? "Banking" : "Ecommerce"} Chat</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsDarkMode((prev) => !prev)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-[#1e1f22] dark:bg-[#1e1f22] dark:text-[#dbdee1] dark:hover:bg-[#35373c]"
+            >
+              {isDarkMode ? "Light Mode" : "Dark Mode"}
+            </button>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-[#1e1f22] dark:text-[#b5bac1]">
+              {connectionText}
+            </span>
+            <SentimentBadge sentiment={sentiment} />
+          </div>
+        </header>
+
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/70 bg-white/80 p-2 dark:border-[#1e1f22] dark:bg-[#2b2d31]">
+          {activeThreads.map((thread) => {
+            const isActive = thread.id === activeSessionId;
+            return (
+              <button
+                key={thread.id}
+                type="button"
+                onClick={() => handleSelectChat(thread.id)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  isActive
+                    ? "bg-indigo-600 text-white dark:bg-[#5865f2]"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-[#1e1f22] dark:text-[#b5bac1] dark:hover:bg-[#35373c]"
+                }`}
+              >
+                {thread.title}
+              </button>
+            );
+          })}
+        </div>
+
+        <main className="min-h-0 flex-1">
+          <ChatWindow messages={messages} />
+        </main>
+
+        <form
+          onSubmit={handleSubmit}
+          className="mt-3 rounded-2xl border border-slate-200/70 bg-white/90 p-3 shadow-sm backdrop-blur dark:border-[#1e1f22] dark:bg-[#2b2d31]"
+        >
+          <div className="mb-3">
+            <VoiceInput onTranscript={handleVoiceTranscript} />
+          </div>
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder={`Ask a ${domain} question...`}
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:border-[#1e1f22] dark:bg-[#383a40] dark:text-[#dbdee1] dark:placeholder:text-[#949ba4] dark:focus:border-[#5865f2] dark:focus:ring-[#5865f2]/25"
+            />
+            <button
+              type="submit"
+              className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#5865f2] dark:hover:bg-[#4752c4]"
+              disabled={!draft.trim() || connectionState !== "open"}
+            >
+              Send
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

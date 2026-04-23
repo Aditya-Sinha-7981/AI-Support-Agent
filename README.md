@@ -72,6 +72,23 @@ source venv/bin/activate  # or venv\Scripts\activate on Windows
 uvicorn main:app --reload --port 8000
 ```
 
+## Running Frontend + Backend Together
+
+```bash
+# Terminal 1 - backend
+cd backend
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+uvicorn main:app --reload --port 8000
+
+# Terminal 2 - frontend
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend defaults to `http://localhost:8000`.  
+If needed, set `VITE_API_BASE_URL` before running dev server.
+
 ---
 
 ## Daily Git Workflow
