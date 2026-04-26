@@ -63,8 +63,10 @@ export default function App() {
   const currentAudioRef = useRef(null);
   const activeSessionId = chatState.activeSessionByDomain[domain];
   const activeThreads = chatState.threadsByDomain[domain];
-
-  const { messages, sentiment, connectionState, sendMessage } = useWebSocket({ domain, sessionId: activeSessionId });
+  const { messages, sentiment, statusText, suggestions, tickets, connectionState, sendMessage } = useWebSocket({
+    domain,
+    sessionId: activeSessionId
+  });
 
   const connectionText = useMemo(() => {
     if (connectionState === "open") return "Connected";
@@ -76,10 +78,8 @@ export default function App() {
   const updateActiveThreadDetails = (messageText) => {
     const trimmed = messageText.trim();
     if (!trimmed) return;
-
     setChatState((prev) => {
-      const currentDomainThreads = prev.threadsByDomain[domain];
-      const updatedThreads = currentDomainThreads.map((thread) => {
+      const updatedThreads = prev.threadsByDomain[domain].map((thread) => {
         if (thread.id !== prev.activeSessionByDomain[domain]) return thread;
         const isDefaultTitle = thread.title.toLowerCase().includes("chat ");
         return {
@@ -127,7 +127,11 @@ export default function App() {
         threadsByDomain: {
           ...prev.threadsByDomain,
           [domain]: [
-            { id: newSessionId, title: `${domain === "banking" ? "Banking" : "Ecommerce"} Chat ${nextIndex}`, updatedAt: Date.now() },
+            {
+              id: newSessionId,
+              title: `${domain === "banking" ? "Banking" : "Ecommerce"} Chat ${nextIndex}`,
+              updatedAt: Date.now()
+            },
             ...prev.threadsByDomain[domain]
           ]
         }
@@ -160,6 +164,15 @@ export default function App() {
         setDraft("");
       }
     }, 250);
+  };
+
+  const handleSuggestionClick = (suggestedText) => {
+    hasUserInteractedRef.current = true;
+    const sent = sendMessage(suggestedText);
+    if (sent) {
+      updateActiveThreadDetails(suggestedText);
+      setDraft("");
+    }
   };
 
   useEffect(() => {
@@ -287,6 +300,29 @@ export default function App() {
           </div>
         </header>
 
+        <section className="mb-3 rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50 p-3 shadow-sm dark:border-indigo-900/60 dark:from-indigo-950/40 dark:to-violet-950/30">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-indigo-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white dark:bg-indigo-500">
+              Tier 1 Live
+            </span>
+            <span className="rounded-full border border-indigo-300 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+              Query Rewriting
+            </span>
+            <span className="rounded-full border border-indigo-300 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+              Live Status
+            </span>
+            <span className="rounded-full border border-indigo-300 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+              Suggestions
+            </span>
+            <span className="rounded-full border border-indigo-300 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+              Escalation Tickets
+            </span>
+            <span className="rounded-full border border-indigo-300 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
+              Language Match
+            </span>
+          </div>
+        </section>
+
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/70 bg-white/80 p-2 dark:border-[#1e1f22] dark:bg-[#2b2d31]">
           {activeThreads.map((thread) => {
             const isActive = thread.id === activeSessionId;
@@ -311,13 +347,63 @@ export default function App() {
           <ChatWindow messages={messages} />
         </main>
 
+        {!!tickets.length && (
+          <section className="mt-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-700 dark:bg-amber-950/25">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-amber-900 dark:text-amber-200">
+                Escalated Tickets
+              </p>
+              <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-800/60 dark:text-amber-100">
+                {tickets.length} ACTIVE
+              </span>
+            </div>
+            <div className="space-y-1">
+              {tickets.map((ticket) => (
+                <div
+                  key={ticket.ticket_id}
+                  className="rounded-lg border border-amber-300/80 bg-white px-3 py-2 text-xs text-amber-900 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-100"
+                >
+                  <span className="font-semibold">#{ticket.ticket_id}</span>
+                  <span className="mx-2">•</span>
+                  <span>{ticket.summary}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <form
           onSubmit={handleSubmit}
           className="mt-3 rounded-2xl border border-slate-200/70 bg-white/90 p-3 shadow-sm backdrop-blur dark:border-[#1e1f22] dark:bg-[#2b2d31]"
         >
+          {!!statusText && (
+            <div className="mb-3 flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 dark:border-sky-800/60 dark:bg-sky-950/30">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-sky-500" />
+              <p className="text-xs font-semibold text-sky-800 dark:text-sky-200">{statusText}</p>
+            </div>
+          )}
           <div className="mb-3">
             <VoiceInput onTranscript={handleVoiceTranscript} />
           </div>
+          {!!suggestions.length && (
+            <div className="mb-3 rounded-xl border border-indigo-200 bg-indigo-50/60 p-2.5 dark:border-indigo-900/60 dark:bg-indigo-950/25">
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                Suggested Next Questions
+              </p>
+              <div className="flex flex-wrap gap-2">
+              {suggestions.map((suggestion, index) => (
+                <button
+                  key={`${suggestion}-${index}`}
+                  type="button"
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  className="rounded-full border border-indigo-300 bg-white px-3 py-1 text-xs font-semibold text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-900/50"
+                >
+                  {suggestion}
+                </button>
+              ))}
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-3">
             <input
               type="text"

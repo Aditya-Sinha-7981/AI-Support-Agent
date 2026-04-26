@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import json
 from typing import AsyncGenerator
 
 from agent.sentiment import detect_sentiment
@@ -104,6 +105,7 @@ def _build_prompt(
     parts = [
         f"You are a helpful customer support assistant for {label}.",
         tone,
+        "Always respond in the same language as the customer's latest message.",
         "Answer using only the provided passages when they contain the answer. "
         "If the answer is not in the passages, say you do not have that information in the documentation.",
         "Do not invent account numbers, fees, or policies that are not stated in the passages.",
@@ -128,6 +130,42 @@ class RAGPipeline:
     def __init__(self) -> None:
         self.last_sources: list[dict] = []
         self.last_sentiment = "neutral"
+        self.last_suggestions: list[str] = []
+
+    async def _rewrite_query(self, message: str, history: list, llm) -> str:
+        hist = _format_history(history[-4:])
+        rewrite_prompt = (
+            "Rewrite the user's latest message as a clear standalone retrieval query.\n"
+            "Keep intent intact. Do not add new facts.\n"
+            "Return only the rewritten query.\n\n"
+            f"Conversation history:\n{hist or '(none)'}\n\n"
+            f'Latest user message: "{message.strip()}"'
+        )
+        rewritten = (await llm.complete(rewrite_prompt)).strip()
+        return rewritten or message.strip()
+
+    async def _generate_suggestions(
+        self, *, llm, assistant_reply: str, user_message: str
+    ) -> list[str]:
+        prompt = (
+            "Based on the latest support exchange, suggest 3 short follow-up questions.\n"
+            "Return only a JSON array of strings.\n\n"
+            f'User message: "{user_message.strip()}"\n'
+            f'Assistant reply: "{assistant_reply.strip()}"'
+        )
+        raw = (await llm.complete(prompt)).strip()
+        try:
+            data = json.loads(raw)
+            if not isinstance(data, list):
+                return []
+            out: list[str] = []
+            for item in data:
+                text = str(item).strip()
+                if text:
+                    out.append(text)
+            return out[:3]
+        except json.JSONDecodeError:
+            return []
 
     async def query(
         self,
@@ -138,6 +176,7 @@ class RAGPipeline:
         domain = _normalize_domain(domain)
         self.last_sources = []
         self.last_sentiment = await detect_sentiment(message)
+        self.last_suggestions = []
         logger.info(
             "RAG start domain=%s sentiment=%s msg_chars=%d history_turns=%d",
             domain,
@@ -160,7 +199,14 @@ class RAGPipeline:
 
         primary_provider = (settings.LLM_PROVIDER or "gemini").strip().lower()
         llm = get_llm_provider(primary_provider)
-        hits = await retriever.search(message.strip(), k=4)
+        retrieval_query = message.strip()
+        try:
+            retrieval_query = await self._rewrite_query(message, history, llm)
+        except Exception:  # noqa: BLE001
+            logger.exception("Query rewrite failed; falling back to original query")
+            retrieval_query = message.strip()
+
+        hits = await retriever.search(retrieval_query, k=4)
         logger.info("RAG retrieved domain=%s hits=%d", domain, len(hits))
         if hits:
             self.last_sources = _sources_from_hits(hits)
@@ -175,10 +221,19 @@ class RAGPipeline:
         logger.info("RAG prompt domain=%s prompt_chars=%d", domain, len(prompt))
 
         stream_token_count = 0
+        full_reply = ""
         try:
             async for token in llm.stream(prompt):
                 stream_token_count += 1
+                full_reply += token
                 yield token
+            try:
+                self.last_suggestions = await self._generate_suggestions(
+                    llm=llm, assistant_reply=full_reply, user_message=message
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("Suggestion generation failed")
+                self.last_suggestions = []
             logger.info(
                 "RAG stream complete domain=%s provider=%s tokens=%d",
                 domain,
@@ -193,7 +248,15 @@ class RAGPipeline:
                     fallback_llm = get_llm_provider("groq")
                     async for token in fallback_llm.stream(prompt):
                         stream_token_count += 1
+                        full_reply += token
                         yield token
+                    try:
+                        self.last_suggestions = await self._generate_suggestions(
+                            llm=fallback_llm, assistant_reply=full_reply, user_message=message
+                        )
+                    except Exception:  # noqa: BLE001
+                        logger.exception("Suggestion generation failed on fallback")
+                        self.last_suggestions = []
                     logger.info(
                         "RAG stream complete domain=%s provider=groq_fallback tokens=%d",
                         domain,

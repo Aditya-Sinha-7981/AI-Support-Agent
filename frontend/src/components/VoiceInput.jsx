@@ -19,6 +19,15 @@ export default function VoiceInput({ onTranscript }) {
       >
         {isRecording ? "Stop Mic" : isTranscribing ? "Transcribing..." : "Voice"}
       </button>
+      {isRecording && (
+        <div className="inline-flex items-end gap-1 rounded-lg bg-rose-100 px-2 py-1 dark:bg-rose-900/25">
+          <span className="h-2 w-1 animate-pulse rounded-sm bg-rose-500 [animation-delay:-0.2s]" />
+          <span className="h-3 w-1 animate-pulse rounded-sm bg-rose-500 [animation-delay:-0.1s]" />
+          <span className="h-4 w-1 animate-pulse rounded-sm bg-rose-500" />
+          <span className="h-3 w-1 animate-pulse rounded-sm bg-rose-500 [animation-delay:-0.15s]" />
+          <span className="h-2 w-1 animate-pulse rounded-sm bg-rose-500 [animation-delay:-0.05s]" />
+        </div>
+      )}
       <p className="text-xs text-slate-500 dark:text-[#949ba4]">
         {error || transcriptPreview || "Tap Voice and speak your question."}
       </p>
