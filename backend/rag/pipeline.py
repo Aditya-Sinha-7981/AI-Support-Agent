@@ -6,6 +6,7 @@ import logging
 from typing import AsyncGenerator
 
 from agent.sentiment import detect_sentiment
+from config import settings
 from providers.llm import get_llm_provider
 from rag.retriever import Retriever
 
@@ -18,6 +19,13 @@ _DOMAIN_LABEL = {
 
 _retrievers: dict[str, Retriever] = {}
 logger = logging.getLogger("ai_support.pipeline")
+
+
+def _safe_int(value: object, default: int = 1) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _get_retriever(domain: str) -> Retriever:
@@ -38,7 +46,7 @@ def _sources_from_hits(hits: list[dict]) -> list[dict]:
     out: list[dict] = []
     for h in hits:
         file_name = h.get("file") or "unknown"
-        page = int(h.get("page", 1))
+        page = _safe_int(h.get("page", 1), default=1)
         key = (file_name, page)
         if key in seen:
             continue
@@ -67,6 +75,11 @@ def _tone_hint(sentiment: str) -> str:
     if sentiment == "positive":
         return "The customer sounds positive; stay warm and clear."
     return "Keep a neutral, professional tone."
+
+
+def _is_quota_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "quota" in text or "429" in text or "resource_exhausted" in text
 
 
 def _build_prompt(
@@ -145,7 +158,8 @@ class RAGPipeline:
                 yield token
             return
 
-        llm = get_llm_provider()
+        primary_provider = (settings.LLM_PROVIDER or "gemini").strip().lower()
+        llm = get_llm_provider(primary_provider)
         hits = await retriever.search(message.strip(), k=4)
         logger.info("RAG retrieved domain=%s hits=%d", domain, len(hits))
         if hits:
@@ -161,10 +175,37 @@ class RAGPipeline:
         logger.info("RAG prompt domain=%s prompt_chars=%d", domain, len(prompt))
 
         stream_token_count = 0
-        async for token in llm.stream(prompt):
-            stream_token_count += 1
-            yield token
-        logger.info("RAG stream complete domain=%s tokens=%d", domain, stream_token_count)
+        try:
+            async for token in llm.stream(prompt):
+                stream_token_count += 1
+                yield token
+            logger.info(
+                "RAG stream complete domain=%s provider=%s tokens=%d",
+                domain,
+                primary_provider,
+                stream_token_count,
+            )
+            return
+        except Exception as primary_exc:  # noqa: BLE001
+            if primary_provider == "gemini" and _is_quota_error(primary_exc):
+                logger.warning("RAG gemini quota hit; attempting groq fallback")
+                try:
+                    fallback_llm = get_llm_provider("groq")
+                    async for token in fallback_llm.stream(prompt):
+                        stream_token_count += 1
+                        yield token
+                    logger.info(
+                        "RAG stream complete domain=%s provider=groq_fallback tokens=%d",
+                        domain,
+                        stream_token_count,
+                    )
+                    return
+                except Exception as fallback_exc:  # noqa: BLE001
+                    logger.exception("RAG groq fallback failed")
+                    raise RuntimeError(
+                        f"Gemini quota exceeded and Groq fallback failed: {fallback_exc}"
+                    ) from fallback_exc
+            raise
 
 
 # Singleton — import and use this instance everywhere

@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     # Use a model id supported by google-genai embed_content (see Google AI ListModels).
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-001"
     GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
 
     # STT
     STT_PROVIDER: str = "local"

@@ -29,3 +29,19 @@ export async function sendVoiceAudio(audioBlob) {
 
   return response.json();
 }
+
+export async function synthesizeSpeech(text) {
+  const response = await fetch(`${API_BASE_URL}/api/tts`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ text })
+  });
+
+  if (!response.ok) {
+    throw new Error("TTS synthesis request failed.");
+  }
+
+  return response.blob();
+}

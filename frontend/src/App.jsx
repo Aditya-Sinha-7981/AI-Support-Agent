@@ -4,6 +4,7 @@ import DomainSwitcher from "./components/DomainSwitcher";
 import SentimentBadge from "./components/SentimentBadge";
 import VoiceInput from "./components/VoiceInput";
 import { useWebSocket } from "./hooks/useWebSocket";
+import { synthesizeSpeech } from "./services/api";
 
 function makeSessionId() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -12,26 +13,54 @@ function makeSessionId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function createInitialChatState() {
+  const bankingId = makeSessionId();
+  const ecommerceId = makeSessionId();
+  const now = Date.now();
+  return {
+    activeSessionByDomain: {
+      banking: bankingId,
+      ecommerce: ecommerceId
+    },
+    threadsByDomain: {
+      banking: [{ id: bankingId, title: "Banking Chat 1", updatedAt: now }],
+      ecommerce: [{ id: ecommerceId, title: "Ecommerce Chat 1", updatedAt: now }]
+    }
+  };
+}
+
+function loadStoredChatState() {
+  try {
+    const raw = window.localStorage.getItem("chatStateByDomain");
+    if (!raw) return createInitialChatState();
+    const parsed = JSON.parse(raw);
+    const bankingThreads = Array.isArray(parsed?.threadsByDomain?.banking)
+      ? parsed.threadsByDomain.banking
+      : [];
+    const ecommerceThreads = Array.isArray(parsed?.threadsByDomain?.ecommerce)
+      ? parsed.threadsByDomain.ecommerce
+      : [];
+    const bankingActive = parsed?.activeSessionByDomain?.banking;
+    const ecommerceActive = parsed?.activeSessionByDomain?.ecommerce;
+    if (!bankingThreads.length || !ecommerceThreads.length || !bankingActive || !ecommerceActive) {
+      return createInitialChatState();
+    }
+    return parsed;
+  } catch {
+    return createInitialChatState();
+  }
+}
+
 export default function App() {
   const [domain, setDomain] = useState("banking");
-  const [chatState, setChatState] = useState(() => {
-    const bankingId = makeSessionId();
-    const ecommerceId = makeSessionId();
-    const now = Date.now();
-    return {
-      activeSessionByDomain: {
-        banking: bankingId,
-        ecommerce: ecommerceId
-      },
-      threadsByDomain: {
-        banking: [{ id: bankingId, title: "Banking Chat 1", updatedAt: now }],
-        ecommerce: [{ id: ecommerceId, title: "Ecommerce Chat 1", updatedAt: now }]
-      }
-    };
-  });
+  const [chatState, setChatState] = useState(loadStoredChatState);
   const [draft, setDraft] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [ttsStatus, setTtsStatus] = useState("idle");
   const voiceSubmitTimerRef = useRef(null);
+  const hasUserInteractedRef = useRef(false);
+  const lastSpokenMessageIdRef = useRef(null);
+  const currentAudioRef = useRef(null);
   const activeSessionId = chatState.activeSessionByDomain[domain];
   const activeThreads = chatState.threadsByDomain[domain];
 
@@ -72,6 +101,7 @@ export default function App() {
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    hasUserInteractedRef.current = true;
     const sent = sendMessage(draft);
     if (sent) {
       updateActiveThreadDetails(draft);
@@ -118,6 +148,7 @@ export default function App() {
   };
 
   const handleVoiceTranscript = (transcript) => {
+    hasUserInteractedRef.current = true;
     setDraft(transcript);
     if (voiceSubmitTimerRef.current) {
       window.clearTimeout(voiceSubmitTimerRef.current);
@@ -147,12 +178,74 @@ export default function App() {
   }, [isDarkMode]);
 
   useEffect(() => {
+    window.localStorage.setItem("chatStateByDomain", JSON.stringify(chatState));
+  }, [chatState]);
+
+  useEffect(() => {
     return () => {
       if (voiceSubmitTimerRef.current) {
         window.clearTimeout(voiceSubmitTimerRef.current);
       }
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
     };
   }, []);
+
+  useEffect(() => {
+    const latestCompletedAssistant = [...messages]
+      .reverse()
+      .find((message) => message.role === "assistant" && message.isComplete && message.content);
+
+    if (!latestCompletedAssistant) return;
+    if (!hasUserInteractedRef.current) return;
+    if (latestCompletedAssistant.id === lastSpokenMessageIdRef.current) return;
+
+    let isCancelled = false;
+    let audioUrl = "";
+
+    const speakLatestAssistant = async () => {
+      try {
+        setTtsStatus("loading");
+        const audioBlob = await synthesizeSpeech(latestCompletedAssistant.content);
+        if (isCancelled) return;
+        audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        audio.onended = () => {
+          if (!isCancelled) {
+            setTtsStatus("idle");
+          }
+          if (audioUrl) {
+            URL.revokeObjectURL(audioUrl);
+            audioUrl = "";
+          }
+        };
+        currentAudioRef.current = audio;
+        await audio.play();
+        if (!isCancelled) {
+          setTtsStatus("playing");
+          lastSpokenMessageIdRef.current = latestCompletedAssistant.id;
+        }
+      } catch {
+        if (!isCancelled) {
+          setTtsStatus("error");
+        }
+      }
+    };
+
+    speakLatestAssistant();
+
+    return () => {
+      isCancelled = true;
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+      }
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [messages]);
 
   return (
     <div className="mx-auto flex h-screen max-w-6xl p-3 text-slate-900 dark:text-[#dbdee1] md:p-5">
@@ -188,6 +281,9 @@ export default function App() {
               {connectionText}
             </span>
             <SentimentBadge sentiment={sentiment} />
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-[#1e1f22] dark:text-[#b5bac1]">
+              {ttsStatus === "loading" ? "TTS..." : ttsStatus === "playing" ? "Speaking" : "TTS Ready"}
+            </span>
           </div>
         </header>
 
