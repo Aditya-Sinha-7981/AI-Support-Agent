@@ -14,14 +14,22 @@ WS /ws/chat/{session_id}?domain={banking|ecommerce}
 { "message": "What is your return policy?" }
 ```
 
-### Server Sends (in this exact order every turn)
+### Server Sends (required order every turn)
 
 | Type | When | Shape |
 |---|---|---|
+| `status` *(optional)* | During processing (Tier 1 UX) | `{ "type": "status", "content": "Searching knowledge base..." }` |
 | `token` | During streaming, one per chunk | `{ "type": "token", "content": "..." }` |
 | `sources` | After stream ends | `{ "type": "sources", "content": [{ "file": "policy.pdf", "page": 4 }] }` |
 | `sentiment` | After sources | `{ "type": "sentiment", "content": "neutral" }` |
+| `suggestions` *(optional)* | After sentiment, before done | `{ "type": "suggestions", "content": ["...", "..."] }` |
+| `ticket` *(optional)* | After sentiment, before done | `{ "type": "ticket", "content": { "ticket_id": "1042", "status": "open" } }` |
 | `done` | Last message of every turn | `{ "type": "done" }` |
+
+**Ordering rules:**
+- Required terminal sequence remains: `sources -> sentiment -> done`
+- `status` may appear before or during token streaming
+- `suggestions`/`ticket` may appear only after `sentiment` and before `done`
 
 ### Sentiment Values
 ```

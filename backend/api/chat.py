@@ -94,10 +94,13 @@ async def chat(websocket: WebSocket, session_id: str):
                 await websocket.send_json(
                     {"type": "status", "content": "Searching knowledge base..."}
                 )
-                await websocket.send_json(
-                    {"type": "status", "content": "Generating response..."}
-                )
+                sent_generating_status = False
                 async for token in pipeline.query(message, domain, history):
+                    if not sent_generating_status:
+                        await websocket.send_json(
+                            {"type": "status", "content": "Generating response..."}
+                        )
+                        sent_generating_status = True
                     full_response += token
                     token_count += 1
 

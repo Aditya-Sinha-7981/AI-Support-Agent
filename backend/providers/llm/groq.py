@@ -54,6 +54,4 @@ class GroqLLM(BaseLLM):
             delta = chunk.choices[0].delta
             text = getattr(delta, "content", None) or ""
             if text:
-                for piece in text.split(" "):
-                    if piece:
-                        yield piece + " "
+                yield text

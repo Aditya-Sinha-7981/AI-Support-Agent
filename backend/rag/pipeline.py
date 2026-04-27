@@ -78,6 +78,45 @@ def _tone_hint(sentiment: str) -> str:
     return "Keep a neutral, professional tone."
 
 
+def _detect_language_hint(message: str) -> str:
+    text = message or ""
+    if any("\u0900" <= ch <= "\u097f" for ch in text):
+        return "Hindi (Devanagari)"
+    if any("\u0c00" <= ch <= "\u0c7f" for ch in text):
+        return "Telugu"
+    if any("\u0980" <= ch <= "\u09ff" for ch in text):
+        return "Bengali"
+    if any("\u0a00" <= ch <= "\u0a7f" for ch in text):
+        return "Punjabi (Gurmukhi)"
+    if any("\u0a80" <= ch <= "\u0aff" for ch in text):
+        return "Gujarati"
+    if any("\u0b00" <= ch <= "\u0b7f" for ch in text):
+        return "Odia"
+    if any("\u0b80" <= ch <= "\u0bff" for ch in text):
+        return "Tamil"
+    if any("\u0c80" <= ch <= "\u0cff" for ch in text):
+        return "Kannada"
+    if any("\u0d00" <= ch <= "\u0d7f" for ch in text):
+        return "Malayalam"
+    if any("\u0600" <= ch <= "\u06ff" for ch in text):
+        return "Arabic"
+    if any("\u0400" <= ch <= "\u04ff" for ch in text):
+        return "Cyrillic-language script"
+    if any("\u4e00" <= ch <= "\u9fff" for ch in text):
+        return "Chinese"
+    if any("\u3040" <= ch <= "\u309f" for ch in text) or any(
+        "\u30a0" <= ch <= "\u30ff" for ch in text
+    ):
+        return "Japanese"
+    if any("\uac00" <= ch <= "\ud7af" for ch in text):
+        return "Korean"
+    if any("\u0e00" <= ch <= "\u0e7f" for ch in text):
+        return "Thai"
+    if any("\u0590" <= ch <= "\u05ff" for ch in text):
+        return "Hebrew"
+    return "Same language as user message"
+
+
 def _is_quota_error(exc: Exception) -> bool:
     text = str(exc).lower()
     return "quota" in text or "429" in text or "resource_exhausted" in text
@@ -94,6 +133,7 @@ def _build_prompt(
     label = _DOMAIN_LABEL.get(domain, "customer support")
     hist = _format_history(history)
     tone = _tone_hint(sentiment)
+    language_hint = _detect_language_hint(message)
 
     context_section = "\n\n---\n\n".join(
         f"[Passage {i + 1}]\n{t}" for i, t in enumerate(context_blocks)
@@ -105,7 +145,16 @@ def _build_prompt(
     parts = [
         f"You are a helpful customer support assistant for {label}.",
         tone,
+        f"Reply language must be exactly: {language_hint}.",
         "Always respond in the same language as the customer's latest message.",
+        "Do not switch to Hindi unless the customer's message is in Hindi.",
+        "Never ask the customer to switch to English.",
+        "If the user writes in Hindi or any non-English language, your full reply must stay in that language.",
+        "If the language is Telugu, reply only in Telugu.",
+        "If the language is Tamil, reply only in Tamil.",
+        "If the language is Kannada, reply only in Kannada.",
+        "If the language is Malayalam, reply only in Malayalam.",
+        "If knowledge is missing, state that limitation in the same user language.",
         "Answer using only the provided passages when they contain the answer. "
         "If the answer is not in the passages, say you do not have that information in the documentation.",
         "Do not invent account numbers, fees, or policies that are not stated in the passages.",
@@ -147,9 +196,11 @@ class RAGPipeline:
     async def _generate_suggestions(
         self, *, llm, assistant_reply: str, user_message: str
     ) -> list[str]:
+        language_hint = _detect_language_hint(user_message)
         prompt = (
             "Based on the latest support exchange, suggest 3 short follow-up questions.\n"
             "Return only a JSON array of strings.\n\n"
+            f"Language rule: Return suggestions in {language_hint}. Never switch to English unless the user wrote in English.\n"
             f'User message: "{user_message.strip()}"\n'
             f'Assistant reply: "{assistant_reply.strip()}"'
         )

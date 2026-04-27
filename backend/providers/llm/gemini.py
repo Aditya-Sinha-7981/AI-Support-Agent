@@ -121,7 +121,4 @@ class GeminiLLM(BaseLLM):
 
             text = getattr(chunk, "text", "")
             if text:
-                # Normalize to smaller token-like pieces for smoother UI updates.
-                for piece in text.split(" "):
-                    if piece:
-                        yield piece + " "
+                yield text
