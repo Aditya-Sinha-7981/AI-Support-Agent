@@ -28,6 +28,14 @@ async def mock_chat(websocket: WebSocket, session_id: str):
         data = await websocket.receive_json()
         message = data.get("message", "")
 
+        await websocket.send_json(
+            {"type": "status", "content": "Searching knowledge base..."}
+        )
+        await asyncio.sleep(0.05)
+        await websocket.send_json(
+            {"type": "status", "content": "Generating response..."}
+        )
+
         # Simulate streaming tokens
         mock_response = (
             f"This is a mock response for domain '{domain}'. "
@@ -51,6 +59,27 @@ async def mock_chat(websocket: WebSocket, session_id: str):
         sentiments = ["neutral", "positive", "frustrated"]
         mock_sentiment = sentiments[len(message) % 3]
         await websocket.send_json({"type": "sentiment", "content": mock_sentiment})
+        await websocket.send_json(
+            {
+                "type": "suggestions",
+                "content": [
+                    "Can you explain this in simple terms?",
+                    "What documents do I need?",
+                    "Are there any fees for this?",
+                ],
+            }
+        )
+        if mock_sentiment == "frustrated":
+            await websocket.send_json(
+                {
+                    "type": "ticket",
+                    "content": {
+                        "ticket_id": "MOCK-1042",
+                        "status": "open",
+                        "summary": "Customer is frustrated and requested escalation.",
+                    },
+                }
+            )
 
         await websocket.send_json({"type": "done"})
 

@@ -79,15 +79,15 @@ OpenAI has no meaningful free tier. Gemini 2.0 Flash is free (1500 req/day, 1M t
 |---|---|---|
 | LLM | Gemini 2.0 Flash | Free, fast, high quality |
 | LLM Fallback | Groq (Llama 3.3 70B) | Free, extremely fast |
-| Embeddings | Gemini text-embedding-004 | Free |
-| RAG Framework | LlamaIndex | Better retrieval primitives than LangChain for pure RAG |
+| Embeddings | Gemini (`GEMINI_EMBEDDING_MODEL`) | Free, configurable via `.env` |
+| RAG Framework | Direct pipeline (`faiss-cpu` + custom retriever) | Simpler, cross-platform, no LlamaIndex dependency |
 | Vector DB | FAISS (local) | No infra, no external service, fast enough |
 | STT Primary | faster-whisper (local) | Free, works on CPU, cross-platform |
 | STT Fallback | Deepgram Nova-2 | Best latency for real demos |
 | TTS | edge-tts | Free, no limits, decent voice quality |
 | Backend | FastAPI | Async, streaming-native, LlamaIndex-friendly |
 | Frontend | React + Tailwind | Fast to build, clean UI |
-| Agent Framework | Simple LangChain sequential | NOT LangGraph — too complex for this team |
+| Agent Flow | Simple sequential pipeline (`router -> rag -> stream`) | Keeps integration straightforward for hackathon pace |
 
 ### Why Not LangGraph?
 LangGraph is the right tool for complex agent state machines but has a real learning curve. For vibe-coding beginners, it becomes spaghetti fast. Simple sequential LangChain chains give 80% of the capability with 20% of the complexity. This was a deliberate decision.
@@ -237,18 +237,8 @@ def add_turn(session_id: str, role: str, content: str):
 
 ### Sentiment Detection
 
-One extra lightweight LLM call per user message.
-
-```python
-async def detect_sentiment(message: str, llm) -> str:
-    prompt = f"""
-    Classify sentiment in one word only.
-    Options: positive, neutral, frustrated, urgent
-    Message: "{message}"
-    One word only.
-    """
-    return (await llm.complete(prompt)).strip().lower()
-```
+Current implementation uses a lightweight rule-based classifier for low latency and reliability.
+It returns API-contract-aligned values only: `positive`, `neutral`, or `frustrated`.
 
 Result is used to:
 1. Update the sentiment badge in the UI
@@ -262,13 +252,15 @@ WS /ws/chat/{session_id}?domain={banking|ecommerce}
 
 Client sends:  { "message": "What is your refund policy?" }
 
-Server sends (in order):
-  { "type": "status", "content": "Searching knowledge base..." }
+Server sends (required terminal order):
+  { "type": "status", "content": "Searching knowledge base..." }   ← optional Tier 1
   { "type": "token", "content": "Our " }          ← streaming
   { "type": "token", "content": "refund " }
   { "type": "token", "content": "policy..." }
   { "type": "sources", "content": [{file, page}] }
   { "type": "sentiment", "content": "neutral" }
+  { "type": "suggestions", "content": ["...", "..."] }             ← optional Tier 1
+  { "type": "ticket", "content": {"ticket_id": "1042"} }           ← optional Tier 1
   { "type": "done" }
 ```
 
@@ -326,9 +318,9 @@ Audio is always captured in the **browser via JavaScript MediaRecorder API**, ne
 | Rule | Reason |
 |---|---|
 | `pathlib.Path` for ALL file paths | Windows uses `\`, Mac uses `/` |
-| Everyone on Python 3.11 exactly | Avoids dependency conflicts |
+| Everyone on Python 3.11 or 3.12+ | 3.11 preferred; 3.12+ works with current stack |
 | Everyone uses venv | No global pip installs |
-| `requirements.txt` with pinned versions | Same environment everywhere |
+| `requirements.txt` with unpinned versions | Avoids brittle pins across Mac/Windows for hackathon velocity |
 | Audio capture in browser JS only | Avoids pyaudio platform issues |
 | faster-whisper always `device="cpu", compute_type="int8"` | GPU differs per platform |
 | `.env` — no spaces around `=`, no unnecessary quotes | Windows dotenv is stricter |
@@ -355,20 +347,21 @@ cp .env.example .env
 
 ```
 # requirements.txt (backend)
-fastapi==0.111.0
-uvicorn[standard]==0.29.0
-python-multipart==0.0.9
-websockets==12.0
-python-dotenv==1.0.1
-llama-index==0.10.40
-faiss-cpu==1.8.0
-google-generativeai==0.7.2
-groq==0.9.0
-llama-index-embeddings-gemini==0.1.7
-faster-whisper==1.0.1
-edge-tts==6.1.10
-httpx==0.27.0
-aiofiles==23.2.1
+fastapi
+uvicorn[standard]
+python-multipart
+websockets
+python-dotenv
+pydantic-settings
+numpy
+faiss-cpu
+pypdf
+google-genai
+groq
+faster-whisper
+edge-tts
+httpx
+aiofiles
 ```
 
 ---

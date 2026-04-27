@@ -1,3 +1,5 @@
+import StreamingIndicator from "./StreamingIndicator";
+
 function SourcesCard({ sources }) {
   if (!sources?.length) return null;
 
@@ -33,9 +35,7 @@ export default function MessageBubble({ message }) {
           {isUser ? "You" : "Assistant"}
         </p>
         <p className="whitespace-pre-wrap">{message.content || (message.isStreaming ? "..." : "")}</p>
-        {!isUser && message.isStreaming && (
-          <p className="mt-2 text-xs italic text-slate-500 dark:text-[#949ba4]">Assistant is thinking...</p>
-        )}
+        {!isUser && message.isStreaming && <StreamingIndicator />}
         {!isUser && <SourcesCard sources={message.sources} />}
       </div>
     </div>

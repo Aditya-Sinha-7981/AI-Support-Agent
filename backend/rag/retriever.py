@@ -14,6 +14,13 @@ from rag.embeddings import embed_query
 DEFAULT_TOP_K = 4
 
 
+def _safe_int(value: Any, default: int = 1) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 class Retriever:
     def __init__(self, domain: str) -> None:
         self.domain = domain
@@ -73,7 +80,7 @@ class Retriever:
             hits.append(
                 {
                     "file": meta.get("file", ""),
-                    "page": int(meta.get("page", 1)),
+                    "page": _safe_int(meta.get("page", 1), default=1),
                     "text": meta.get("text", ""),
                     "score": float(score),
                 }

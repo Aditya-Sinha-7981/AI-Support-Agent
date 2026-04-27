@@ -4,7 +4,7 @@ Verify CORE Step 3 contract on the real FastAPI WebSocket route.
 
 Checks:
 1) `/ws/chat/{session_id}?domain=...` accepts a message.
-2) Server emits `token* -> sources -> sentiment -> done` in order.
+2) Server emits required terminal sequence with optional extras.
 3) At least one token is streamed.
 
 Run from backend/:
@@ -52,14 +52,14 @@ def _assert_event_order(events: list[dict]) -> None:
 
     token_count = sum(1 for t in event_types[:first_sources] if t == "token")
     non_token_before_sources = [
-        t for t in event_types[:first_sources] if t not in {"token"}
+        t for t in event_types[:first_sources] if t not in {"token", "status"}
     ]
 
     if token_count == 0:
         raise AssertionError("Expected at least one token event before sources.")
     if non_token_before_sources:
         raise AssertionError(
-            f"Only token events allowed before sources. Got: {non_token_before_sources}"
+            f"Only token/status events allowed before sources. Got: {non_token_before_sources}"
         )
 
     if any(t == "token" for t in event_types[first_sources:]):
@@ -73,6 +73,13 @@ def _assert_event_order(events: list[dict]) -> None:
     if sentiment_payload not in VALID_SENTIMENTS:
         raise AssertionError(
             f"`sentiment.content` must be one of {sorted(VALID_SENTIMENTS)}, got {sentiment_payload!r}."
+        )
+
+    tail = event_types[first_sentiment + 1 : done_idx]
+    invalid_tail_types = [t for t in tail if t not in {"suggestions", "ticket"}]
+    if invalid_tail_types:
+        raise AssertionError(
+            f"Only suggestions/ticket may appear after sentiment before done. Got: {invalid_tail_types}"
         )
 
 

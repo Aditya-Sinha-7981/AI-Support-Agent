@@ -5,9 +5,16 @@ router = APIRouter()
 ALLOWED_AUDIO_TYPES = {"audio/webm", "audio/wav", "audio/x-wav", "audio/wave"}
 
 
+def _normalize_content_type(content_type: str | None) -> str:
+    if not content_type:
+        return ""
+    return content_type.split(";", 1)[0].strip().lower()
+
+
 @router.post("/api/voice")
 async def voice_input(audio: UploadFile = File(...)):
-    if audio.content_type and audio.content_type.lower() not in ALLOWED_AUDIO_TYPES:
+    normalized_type = _normalize_content_type(audio.content_type)
+    if normalized_type and normalized_type not in ALLOWED_AUDIO_TYPES:
         raise HTTPException(
             status_code=400,
             detail="Unsupported audio format. Use webm or wav.",

@@ -2,6 +2,7 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from agent.escalation import maybe_create_ticket
 from agent.memory import add_turn, clear, get_history
 from agent.router import route
 from rag.pipeline import pipeline
@@ -14,10 +15,19 @@ _session_domains: dict[str, str] = {}
 
 
 async def _send_turn_end(
-    websocket: WebSocket, *, sources: list | None = None, sentiment: str = "neutral"
+    websocket: WebSocket,
+    *,
+    sources: list | None = None,
+    sentiment: str = "neutral",
+    suggestions: list[str] | None = None,
+    ticket: dict | None = None,
 ) -> None:
     await websocket.send_json({"type": "sources", "content": sources or []})
     await websocket.send_json({"type": "sentiment", "content": sentiment})
+    if suggestions:
+        await websocket.send_json({"type": "suggestions", "content": suggestions})
+    if ticket:
+        await websocket.send_json({"type": "ticket", "content": ticket})
     await websocket.send_json({"type": "done"})
 
 
@@ -79,8 +89,18 @@ async def chat(websocket: WebSocket, session_id: str):
             # 3. Pipeline call
             full_response = ""
             token_count = 0
+            ticket: dict | None = None
             try:
+                await websocket.send_json(
+                    {"type": "status", "content": "Searching knowledge base..."}
+                )
+                sent_generating_status = False
                 async for token in pipeline.query(message, domain, history):
+                    if not sent_generating_status:
+                        await websocket.send_json(
+                            {"type": "status", "content": "Generating response..."}
+                        )
+                        sent_generating_status = True
                     full_response += token
                     token_count += 1
 
@@ -89,11 +109,27 @@ async def chat(websocket: WebSocket, session_id: str):
                         "content": token
                     })
 
+                ticket = maybe_create_ticket(
+                    session_id,
+                    sentiment=pipeline.last_sentiment,
+                    user_message=message,
+                    assistant_reply=full_response,
+                )
+                if ticket:
+                    escalation_note = (
+                        "\n\nI have escalated this to our support team. "
+                        f"Ticket #{ticket['ticket_id']} has been created."
+                    )
+                    await websocket.send_json({"type": "token", "content": escalation_note})
+                    full_response += escalation_note
+
                 # 4. Sources → sentiment → done (API contract order)
                 await _send_turn_end(
                     websocket,
                     sources=pipeline.last_sources,
                     sentiment=pipeline.last_sentiment,
+                    suggestions=pipeline.last_suggestions,
+                    ticket=ticket,
                 )
                 logger.info(
                     "WS done session=%s tokens=%d resp_chars=%d sentiment=%s sources=%s preview=%r",
