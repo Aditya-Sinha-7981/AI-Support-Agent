@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     # LLM
     LLM_PROVIDER: str = "gemini"
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    GEMINI_MODEL: str = "gemini-2.5-flash-lite"
     GEMINI_THINKING_BUDGET: int = 0
     GEMINI_MAX_OUTPUT_TOKENS: int = 512
     # Embeddings (RAG retrieval; uses Gemini even when LLM_PROVIDER=groq)

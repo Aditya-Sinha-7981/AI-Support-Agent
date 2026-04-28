@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-import logging
+import asyncio
 import json
-from typing import AsyncGenerator
+import logging
+import re
+import time
+from collections import OrderedDict
+from typing import Any, AsyncGenerator
 
 from agent.sentiment import detect_sentiment
 from config import settings
@@ -122,6 +126,83 @@ def _is_quota_error(exc: Exception) -> bool:
     return "quota" in text or "429" in text or "resource_exhausted" in text
 
 
+# Words that suggest the message refers back to earlier turns and benefits from
+# a rewrite that resolves anaphora into a standalone retrieval query.
+_REFERENT_RE = re.compile(
+    r"\b(it|its|that|this|those|these|they|them|their|same|above|earlier|previous|prev)\b",
+    re.IGNORECASE,
+)
+
+
+def _should_rewrite(message: str, history: list) -> bool:
+    """Decide whether the LLM rewrite call is worth spending a quota request on."""
+    text = (message or "").strip()
+    if not text:
+        return False
+    if len(history or []) < 2:
+        return False
+    if len(text) >= 60:
+        return False
+    return bool(_REFERENT_RE.search(text))
+
+
+def _groq_configured() -> bool:
+    """True only when GROQ_API_KEY is set to a real value (not blank or placeholder)."""
+    key = (settings.GROQ_API_KEY or "").strip()
+    if not key:
+        return False
+    return key.lower() not in {"your_key_here", "your-key-here", "changeme"}
+
+
+def _normalize_message(message: str) -> str:
+    return " ".join((message or "").lower().split())
+
+
+class _LruTtlCache:
+    """Tiny in-memory LRU with per-entry TTL; used for repeat-query short-circuit."""
+
+    def __init__(self, capacity: int = 64, ttl_seconds: float = 900.0) -> None:
+        self._capacity = max(1, capacity)
+        self._ttl = max(0.0, ttl_seconds)
+        self._items: "OrderedDict[str, tuple[float, dict[str, Any]]]" = OrderedDict()
+
+    def get(self, key: str) -> dict[str, Any] | None:
+        item = self._items.get(key)
+        if item is None:
+            return None
+        ts, value = item
+        if time.monotonic() - ts > self._ttl:
+            self._items.pop(key, None)
+            return None
+        self._items.move_to_end(key)
+        return value
+
+    def set(self, key: str, value: dict[str, Any]) -> None:
+        if key in self._items:
+            self._items.move_to_end(key)
+        self._items[key] = (time.monotonic(), value)
+        while len(self._items) > self._capacity:
+            self._items.popitem(last=False)
+
+
+_response_cache = _LruTtlCache(capacity=64, ttl_seconds=900.0)
+
+
+# Cap concurrent LLM calls so a burst of users cannot blow through RPM at once.
+_LLM_SEMAPHORE = asyncio.Semaphore(2)
+
+
+async def _bounded_complete(llm, prompt: str) -> str:
+    async with _LLM_SEMAPHORE:
+        return await llm.complete(prompt)
+
+
+async def _bounded_stream(llm, prompt: str) -> AsyncGenerator[str, None]:
+    async with _LLM_SEMAPHORE:
+        async for token in llm.stream(prompt):
+            yield token
+
+
 def _build_prompt(
     *,
     domain: str,
@@ -190,7 +271,7 @@ class RAGPipeline:
             f"Conversation history:\n{hist or '(none)'}\n\n"
             f'Latest user message: "{message.strip()}"'
         )
-        rewritten = (await llm.complete(rewrite_prompt)).strip()
+        rewritten = (await _bounded_complete(llm, rewrite_prompt)).strip()
         return rewritten or message.strip()
 
     async def _generate_suggestions(
@@ -204,7 +285,7 @@ class RAGPipeline:
             f'User message: "{user_message.strip()}"\n'
             f'Assistant reply: "{assistant_reply.strip()}"'
         )
-        raw = (await llm.complete(prompt)).strip()
+        raw = (await _bounded_complete(llm, prompt)).strip()
         try:
             data = json.loads(raw)
             if not isinstance(data, list):
@@ -248,14 +329,31 @@ class RAGPipeline:
                 yield token
             return
 
+        cache_key = f"{domain}::{_normalize_message(message)}"
+        cached = _response_cache.get(cache_key)
+        if cached:
+            logger.info(
+                "RAG cache hit domain=%s tokens=%d",
+                domain,
+                len(cached.get("tokens", [])),
+            )
+            self.last_sources = list(cached.get("sources", []))
+            self.last_suggestions = list(cached.get("suggestions", []))
+            for token in cached.get("tokens", []):
+                yield token
+            return
+
         primary_provider = (settings.LLM_PROVIDER or "gemini").strip().lower()
         llm = get_llm_provider(primary_provider)
         retrieval_query = message.strip()
-        try:
-            retrieval_query = await self._rewrite_query(message, history, llm)
-        except Exception:  # noqa: BLE001
-            logger.exception("Query rewrite failed; falling back to original query")
-            retrieval_query = message.strip()
+        if _should_rewrite(message, history):
+            try:
+                retrieval_query = await self._rewrite_query(message, history, llm)
+            except Exception:  # noqa: BLE001
+                logger.exception("Query rewrite failed; falling back to original query")
+                retrieval_query = message.strip()
+        else:
+            logger.info("RAG rewrite skipped domain=%s (heuristic)", domain)
 
         hits = await retriever.search(retrieval_query, k=4)
         logger.info("RAG retrieved domain=%s hits=%d", domain, len(hits))
@@ -271,55 +369,91 @@ class RAGPipeline:
         )
         logger.info("RAG prompt domain=%s prompt_chars=%d", domain, len(prompt))
 
-        stream_token_count = 0
+        stream_tokens: list[str] = []
         full_reply = ""
         try:
-            async for token in llm.stream(prompt):
-                stream_token_count += 1
+            async for token in _bounded_stream(llm, prompt):
+                stream_tokens.append(token)
                 full_reply += token
                 yield token
-            try:
-                self.last_suggestions = await self._generate_suggestions(
-                    llm=llm, assistant_reply=full_reply, user_message=message
-                )
-            except Exception:  # noqa: BLE001
-                logger.exception("Suggestion generation failed")
+            if full_reply.strip():
+                try:
+                    self.last_suggestions = await self._generate_suggestions(
+                        llm=llm, assistant_reply=full_reply, user_message=message
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.exception("Suggestion generation failed")
+                    self.last_suggestions = []
+            else:
                 self.last_suggestions = []
+            self._store_cache(cache_key, stream_tokens)
             logger.info(
                 "RAG stream complete domain=%s provider=%s tokens=%d",
                 domain,
                 primary_provider,
-                stream_token_count,
+                len(stream_tokens),
             )
             return
         except Exception as primary_exc:  # noqa: BLE001
-            if primary_provider == "gemini" and _is_quota_error(primary_exc):
-                logger.warning("RAG gemini quota hit; attempting groq fallback")
-                try:
-                    fallback_llm = get_llm_provider("groq")
-                    async for token in fallback_llm.stream(prompt):
-                        stream_token_count += 1
-                        full_reply += token
-                        yield token
+            should_try_groq = (
+                primary_provider == "gemini"
+                and _is_quota_error(primary_exc)
+                and _groq_configured()
+            )
+            if not should_try_groq:
+                if (
+                    primary_provider == "gemini"
+                    and _is_quota_error(primary_exc)
+                    and not _groq_configured()
+                ):
+                    logger.warning(
+                        "RAG gemini quota hit; groq fallback skipped (GROQ_API_KEY not configured)"
+                    )
+                raise
+
+            logger.warning("RAG gemini quota hit; attempting groq fallback")
+            try:
+                fallback_llm = get_llm_provider("groq")
+                async for token in _bounded_stream(fallback_llm, prompt):
+                    stream_tokens.append(token)
+                    full_reply += token
+                    yield token
+                if full_reply.strip():
                     try:
                         self.last_suggestions = await self._generate_suggestions(
-                            llm=fallback_llm, assistant_reply=full_reply, user_message=message
+                            llm=fallback_llm,
+                            assistant_reply=full_reply,
+                            user_message=message,
                         )
                     except Exception:  # noqa: BLE001
                         logger.exception("Suggestion generation failed on fallback")
                         self.last_suggestions = []
-                    logger.info(
-                        "RAG stream complete domain=%s provider=groq_fallback tokens=%d",
-                        domain,
-                        stream_token_count,
-                    )
-                    return
-                except Exception as fallback_exc:  # noqa: BLE001
-                    logger.exception("RAG groq fallback failed")
-                    raise RuntimeError(
-                        f"Gemini quota exceeded and Groq fallback failed: {fallback_exc}"
-                    ) from fallback_exc
-            raise
+                else:
+                    self.last_suggestions = []
+                self._store_cache(cache_key, stream_tokens)
+                logger.info(
+                    "RAG stream complete domain=%s provider=groq_fallback tokens=%d",
+                    domain,
+                    len(stream_tokens),
+                )
+                return
+            except Exception as fallback_exc:  # noqa: BLE001
+                logger.exception("RAG groq fallback failed")
+                raise RuntimeError(
+                    f"Gemini quota exceeded and Groq fallback failed: {fallback_exc}"
+                ) from fallback_exc
+
+    def _store_cache(self, cache_key: str, stream_tokens: list[str]) -> None:
+        if not stream_tokens:
+            return
+        _response_cache.set(
+            cache_key,
+            {
+                "tokens": list(stream_tokens),
+                "sources": list(self.last_sources),
+                "suggestions": list(self.last_suggestions),
+            },
+        )
 
 
 # Singleton — import and use this instance everywhere
