@@ -344,8 +344,10 @@ class RAGPipeline:
             )
             self.last_sources = list(cached.get("sources", []))
             self.last_suggestions = list(cached.get("suggestions", []))
-            for token in cached.get("tokens", []):
-                yield token
+
+            full_cached_text = "".join(cached.get("tokens", []))
+            yield full_cached_text
+
             return
 
         retrieval_query = message.strip()
