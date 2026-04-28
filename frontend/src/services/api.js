@@ -63,3 +63,15 @@ export async function uploadAdminDocument(domain, file) {
 
   return payload;
 }
+
+export async function exportConversation(sessionId) {
+  if (!sessionId) {
+    throw new Error("Session ID is required for export.");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/export`);
+  if (!response.ok) {
+    throw new Error("Conversation export request failed.");
+  }
+  return response.blob();
+}

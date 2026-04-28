@@ -1,20 +1,14 @@
-import React from 'react';
+import React from "react";
+
+import { exportConversation } from "../services/api";
 
 const ExportButton = ({ sessionId }) => {
     const handleExportChat = async () => {
-        // Fallback session ID in case it hasn't loaded yet
-        const currentSessionId = sessionId || "default-session-id"; 
+        const currentSessionId = sessionId;
         
         try {
-            // Reaches out to your FastAPI backend
-            const response = await fetch(`http://localhost:8000/sessions/${currentSessionId}/export`);
-            
-            if (!response.ok) {
-                throw new Error("Failed to export chat");
-            }
-
             // Convert the incoming data into a File Blob
-            const blob = await response.blob();
+            const blob = await exportConversation(currentSessionId);
             
             // Create a temporary hidden URL for the Blob
             const url = window.URL.createObjectURL(blob);
@@ -39,6 +33,7 @@ const ExportButton = ({ sessionId }) => {
     return (
         <button
             onClick={handleExportChat}
+            disabled={!sessionId}
             className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-md shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
             title="Download Chat Transcript"
         >
