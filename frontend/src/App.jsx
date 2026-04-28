@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import ChatWindow from "./components/ChatWindow";
-import DomainSwitcher from "./components/DomainSwitcher";
-import SentimentBadge from "./components/SentimentBadge";
-import VoiceInput from "./components/VoiceInput";
 import AdminUploadPanel from "./components/AdminUploadPanel";
-import ExportButton from "./components/ExportButton";
+import InputBar from "./components/InputBar";
+import IntroScreen from "./components/IntroScreen";
+import TopBar from "./components/TopBar";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { synthesizeSpeech } from "./services/api";
 
@@ -59,6 +59,7 @@ export default function App() {
   const [draft, setDraft] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [ttsStatus, setTtsStatus] = useState("idle");
+  const [showIntro, setShowIntro] = useState(true);
   const voiceSubmitTimerRef = useRef(null);
   const hasUserInteractedRef = useRef(false);
   const lastSpokenMessageByConversationRef = useRef({});
@@ -313,171 +314,152 @@ export default function App() {
     };
   }, [messages, activeConversationKey]);
 
+  const uiVariants = useMemo(
+    () => ({
+      hidden: { opacity: 0 },
+      show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: showIntro ? 0.15 : 0 } }
+    }),
+    [showIntro]
+  );
+
+  const itemVariants = useMemo(
+    () => ({
+      hidden: { opacity: 0, y: 10, scale: 0.99 },
+      show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.28, ease: "easeOut" } }
+    }),
+    []
+  );
+
   return (
     <div className="mx-auto flex h-screen max-w-6xl p-3 text-slate-900 dark:text-[#dbdee1] md:p-5">
+      <IntroScreen isVisible={showIntro} onDone={() => setShowIntro(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-sm backdrop-blur dark:border-[#1e1f22] dark:bg-[#2b2d31]">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-lg font-bold tracking-tight">AI Support Agent</p>
-              <p className="text-xs text-slate-500 dark:text-[#b5bac1]">
-                Real-time support chat for {domain}
-              </p>
-            </div>
-          </div>
-
-          <DomainSwitcher activeDomain={domain} onSwitch={handleDomainSwitch} />
-          <div className="flex items-center gap-2">
-            
-            {/* HERE IS THE CORRECTLY UPDATED BUTTON */}
-            <ExportButton sessionId={activeSessionId} />
-
-            <button
-              type="button"
-              onClick={handleNewChat}
-              className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 dark:bg-[#5865f2] dark:hover:bg-[#4752c4]"
-            >
-              <span>+</span>
-              <span>New {domain === "banking" ? "Banking" : "Ecommerce"} Chat</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsDarkMode((prev) => !prev)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-[#1e1f22] dark:bg-[#1e1f22] dark:text-[#dbdee1] dark:hover:bg-[#35373c]"
-            >
-              {isDarkMode ? "Light Mode" : "Dark Mode"}
-            </button>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-[#1e1f22] dark:text-[#b5bac1]">
-              {connectionText}
-            </span>
-            <SentimentBadge sentiment={sentiment} />
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-[#1e1f22] dark:text-[#b5bac1]">
-              {ttsStatus === "loading" ? "TTS..." : ttsStatus === "playing" ? "Speaking" : "TTS Ready"}
-            </span>
-          </div>
-        </header>
-
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/70 bg-white/80 p-2 dark:border-[#1e1f22] dark:bg-[#2b2d31]">
-          {activeThreads.map((thread) => {
-            const isActive = thread.id === activeSessionId;
-            return (
-              <div
-                key={thread.id}
-                className={`group relative rounded-lg pr-5 ${
-                  isActive ? "bg-indigo-600 dark:bg-[#5865f2]" : "bg-slate-100 dark:bg-[#1e1f22]"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => handleSelectChat(thread.id)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                    isActive
-                      ? "text-white"
-                      : "text-slate-700 hover:bg-slate-200 dark:text-[#b5bac1] dark:hover:bg-[#35373c]"
-                  }`}
-                >
-                  {thread.title}
-                </button>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleDeleteChat(thread.id);
-                  }}
-                  className={`absolute right-1 top-1/2 -translate-y-1/2 rounded px-1 text-[10px] font-bold transition ${
-                    isActive
-                      ? "text-white/80 hover:bg-white/20 hover:text-white"
-                      : "text-slate-500 hover:bg-slate-200 hover:text-slate-800 dark:text-[#949ba4] dark:hover:bg-[#35373c] dark:hover:text-[#dbdee1]"
-                  }`}
-                  aria-label={`Delete ${thread.title}`}
-                  title="Delete chat"
-                >
-                  ×
-                </button>
-              </div>
-            );
-          })}
-        </div>
-
-        <main className="min-h-0 flex-1">
-          <AdminUploadPanel domain={domain} />
-          <ChatWindow messages={messages} />
-        </main>
-
-        {!!tickets.length && (
-          <section className="mt-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-700 dark:bg-amber-950/25">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-xs font-bold uppercase tracking-wide text-amber-900 dark:text-amber-200">
-                Escalated Tickets
-              </p>
-              <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-800/60 dark:text-amber-100">
-                {tickets.length} ACTIVE
-              </span>
-            </div>
-            <div className="space-y-1">
-              {tickets.map((ticket) => (
-                <div
-                  key={ticket.ticket_id}
-                  className="rounded-lg border border-amber-300/80 bg-white px-3 py-2 text-xs text-amber-900 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-100"
-                >
-                  <span className="font-semibold">#{ticket.ticket_id}</span>
-                  <span className="mx-2">•</span>
-                  <span>{ticket.summary}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <form
-          onSubmit={handleSubmit}
-          className="mt-3 rounded-2xl border border-slate-200/70 bg-white/90 p-3 shadow-sm backdrop-blur dark:border-[#1e1f22] dark:bg-[#2b2d31]"
-        >
-          {!!statusText && (
-            <div className="mb-3 flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 dark:border-sky-800/60 dark:bg-sky-950/30">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-sky-500" />
-              <p className="text-xs font-semibold text-sky-800 dark:text-sky-200">{statusText}</p>
-            </div>
-          )}
-          <div className="mb-3">
-            <VoiceInput onTranscript={handleVoiceTranscript} />
-          </div>
-          {!!suggestions.length && (
-            <div className="mb-3 rounded-xl border border-indigo-200 bg-indigo-50/60 p-2.5 dark:border-indigo-900/60 dark:bg-indigo-950/25">
-              <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
-                Suggested Next Questions
-              </p>
-              <div className="flex flex-wrap gap-2">
-              {suggestions.map((suggestion, index) => (
-                <button
-                  key={`${suggestion}-${index}`}
-                  type="button"
-                  onClick={() => handleSuggestionClick(suggestion)}
-                  className="rounded-full border border-indigo-300 bg-white px-3 py-1 text-xs font-semibold text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-900/50"
-                >
-                  {suggestion}
-                </button>
-              ))}
-              </div>
-            </div>
-          )}
-          <div className="flex items-center gap-3">
-            <input
-              type="text"
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              placeholder={`Ask a ${domain} question...`}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:border-[#1e1f22] dark:bg-[#383a40] dark:text-[#dbdee1] dark:placeholder:text-[#949ba4] dark:focus:border-[#5865f2] dark:focus:ring-[#5865f2]/25"
+        <motion.div variants={uiVariants} initial="hidden" animate={showIntro ? "hidden" : "show"}>
+          <motion.div variants={itemVariants}>
+            <TopBar
+              domain={domain}
+              activeSessionId={activeSessionId}
+              onDomainSwitch={handleDomainSwitch}
+              onNewChat={handleNewChat}
+              isDarkMode={isDarkMode}
+              onToggleTheme={() => setIsDarkMode((prev) => !prev)}
+              connectionText={connectionText}
+              sentiment={sentiment}
+              ttsStatus={ttsStatus}
             />
-            <button
-              type="submit"
-              className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#5865f2] dark:hover:bg-[#4752c4]"
-              disabled={!draft.trim() || connectionState !== "open"}
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <motion.div
+              className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/70 bg-white/80 p-2 dark:border-[#1e1f22] dark:bg-[#2b2d31]"
+              initial="hidden"
+              animate="show"
+              variants={{
+                hidden: { opacity: 0, y: 10 },
+                show: { opacity: 1, y: 0, transition: { staggerChildren: 0.04 } }
+              }}
             >
-              Send
-            </button>
-          </div>
-        </form>
+              <AnimatePresence initial={false}>
+                {activeThreads.map((thread) => {
+                  const isActive = thread.id === activeSessionId;
+                  return (
+                    <motion.div
+                      key={thread.id}
+                      layout
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0, transition: { duration: 0.18 } }}
+                      exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+                      className={`group relative rounded-lg pr-5 ${
+                        isActive ? "bg-indigo-600 dark:bg-[#5865f2]" : "bg-slate-100 dark:bg-[#1e1f22]"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSelectChat(thread.id)}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                          isActive
+                            ? "text-white"
+                            : "text-slate-700 hover:bg-slate-200 dark:text-[#b5bac1] dark:hover:bg-[#35373c]"
+                        }`}
+                      >
+                        {thread.title}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleDeleteChat(thread.id);
+                        }}
+                        className={`absolute right-1 top-1/2 -translate-y-1/2 rounded px-1 text-[10px] font-bold transition ${
+                          isActive
+                            ? "text-white/80 hover:bg-white/20 hover:text-white"
+                            : "text-slate-500 hover:bg-slate-200 hover:text-slate-800 dark:text-[#949ba4] dark:hover:bg-[#35373c] dark:hover:text-[#dbdee1]"
+                        }`}
+                        aria-label={`Delete ${thread.title}`}
+                        title="Delete chat"
+                      >
+                        ×
+                      </button>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </motion.div>
+          </motion.div>
+
+          <motion.main variants={itemVariants} className="min-h-0 flex-1">
+            <AdminUploadPanel domain={domain} />
+            <ChatWindow messages={messages} />
+          </motion.main>
+
+          <AnimatePresence initial={false}>
+            {!!tickets.length && (
+              <motion.section
+                key="tickets"
+                variants={itemVariants}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0, transition: { duration: 0.22, ease: "easeOut" } }}
+                exit={{ opacity: 0, y: -8, transition: { duration: 0.14 } }}
+                className="mt-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-700 dark:bg-amber-950/25"
+              >
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-xs font-bold uppercase tracking-wide text-amber-900 dark:text-amber-200">
+                    Escalated Tickets
+                  </p>
+                  <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-800/60 dark:text-amber-100">
+                    {tickets.length} ACTIVE
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  {tickets.map((ticket) => (
+                    <div
+                      key={ticket.ticket_id}
+                      className="rounded-lg border border-amber-300/80 bg-white px-3 py-2 text-xs text-amber-900 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-100"
+                    >
+                      <span className="font-semibold">#{ticket.ticket_id}</span>
+                      <span className="mx-2">•</span>
+                      <span>{ticket.summary}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.section>
+            )}
+          </AnimatePresence>
+
+          <motion.div variants={itemVariants}>
+            <InputBar
+              domain={domain}
+              draft={draft}
+              setDraft={setDraft}
+              onSubmit={handleSubmit}
+              statusText={statusText}
+              suggestions={suggestions}
+              onSuggestionClick={handleSuggestionClick}
+              onVoiceTranscript={handleVoiceTranscript}
+              connectionState={connectionState}
+            />
+          </motion.div>
+        </motion.div>
       </div>
     </div>
   );

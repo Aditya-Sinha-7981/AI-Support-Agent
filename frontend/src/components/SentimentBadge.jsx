@@ -1,3 +1,5 @@
+import { AnimatePresence, motion } from "framer-motion";
+
 const SENTIMENT_UI = {
   positive: {
     emoji: "😊",
@@ -20,9 +22,23 @@ export default function SentimentBadge({ sentiment = "neutral" }) {
   const mood = SENTIMENT_UI[sentiment] || SENTIMENT_UI.neutral;
 
   return (
-    <div className={`rounded-full px-3 py-1 text-xs font-semibold tracking-wide ${mood.className}`}>
-      <span className="mr-1">{mood.emoji}</span>
-      {mood.label}
-    </div>
+    <motion.div
+      layout
+      className={`rounded-full px-3 py-1 text-xs font-semibold tracking-wide ${mood.className}`}
+      transition={{ type: "spring", stiffness: 520, damping: 34 }}
+    >
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={sentiment}
+          className="inline-flex items-center"
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0, transition: { duration: 0.18 } }}
+          exit={{ opacity: 0, y: -4, transition: { duration: 0.14 } }}
+        >
+          <span className="mr-1">{mood.emoji}</span>
+          {mood.label}
+        </motion.span>
+      </AnimatePresence>
+    </motion.div>
   );
 }
