@@ -8,4 +8,178 @@ Customers must provide a government-issued photo ID and proof of address dated w
 Domestic wire transfer requests received before 2:00 PM Eastern Time on a business day
 are typically processed the same day. International wires may take two to five business days.
 
-here refund policy is  not available 
+Global Horizon Bank - Consumer Banking Policies and Guidelines
+Effective Date: January 1, 2026
+
+1. Account Opening and KYC (Know Your Customer) Requirements
+To comply with federal regulations, all applicants must undergo identity verification before opening any depository account.
+
+- Primary Identification: Must provide one valid, unexpired government-issued photo ID (e.g., Driver's License, State ID, Passport, or Military ID).
+- Secondary Identification: Social Security Number (SSN) or Individual Taxpayer Identification Number (ITIN).
+- Proof of Address: Must provide a utility bill, lease agreement, or payroll stub dated within the last 90 days. P.O. Boxes are not accepted as a primary physical address.
+- Age Requirement: Applicants must be at least 18 years old. Minors aged 13-17 may open a Joint Student Account with a qualifying adult co-owner.
+
+
+2. Depository Accounts and Interest Rates (APY)
+Interest rates are variable and subject to change without notice. Interest is compounded daily and credited monthly.
+
+Account Type: Standard Checking
+Minimum Deposit: $100
+APY: 0.00%
+Monthly Maintenance Fee: $12.00
+Fee Waiver Condition: Maintain $1,500 daily balance or direct deposits totaling $500/month.
+
+Account Type: High-Yield Savings
+Minimum Deposit: $500
+APY: 4.25%
+Monthly Maintenance Fee: $0.00
+Fee Waiver Condition: None.
+
+Account Type: Premium Checking
+Minimum Deposit: $2,500
+APY: 0.50%
+Monthly Maintenance Fee: $25.00
+Fee Waiver Condition: Maintain $10,000 combined daily balance across all accounts.
+
+Account Type: 12-Month CD
+Minimum Deposit: $1,000
+APY: 5.00%
+Monthly Maintenance Fee: $0.00
+Fee Waiver Condition: Early withdrawal penalty applies (3 months of interest).
+
+
+3. Comprehensive Fee Schedule
+The following fees apply to all consumer checking and savings accounts unless otherwise waived by promotional offers or account tiers.
+
+- Overdraft Fee: $35.00 per item (Maximum of 3 charges per business day).
+- Non-Sufficient Funds (NSF) Fee: $0.00 (Eliminated as of 2025).
+- Stop Payment Request: $30.00 per request.
+- Domestic Wire Transfer (Incoming): $15.00
+- Domestic Wire Transfer (Outgoing): $30.00
+- International Wire Transfer (Outgoing): $45.00 plus applicable foreign exchange margin.
+- Card Replacement Fee: Standard delivery is free. Expedited shipping is $15.00.
+
+
+4. Refund, Dispute, and Fraud Policies
+Global Horizon Bank provides protection against unauthorized transactions under the Electronic Fund Transfer Act (Regulation E).
+
+- Reporting Timelines: Customers must report unauthorized transactions or billing errors within 60 days of the statement date on which the error appeared.
+- Provisional Credit: For disputes taking longer than 10 business days to investigate, the bank will issue a temporary provisional credit to the account for the disputed amount.
+- Merchant Disputes (Refunds): If a customer is unsatisfied with a purchased product or service (but authorized the charge), they must attempt to resolve the issue directly with the merchant before filing a bank dispute. The bank requires proof of the merchant's refund policy and the customer's attempt to contact them.
+- Resolution Timeframe: Most fraud investigations are concluded within 45 days, though complex international disputes may take up to 90 days.
+
+
+5. Consumer Loan Policies
+Personal and Auto loans are subject to credit approval and income verification.
+
+- Personal Loans: Unsecured loans available from $2,000 to $50,000. Fixed APR ranges from 8.99% to 24.99% based on creditworthiness. Minimum FICO score required is 660.
+- Auto Loans (New): Terms available up to 84 months. Minimum down payment of 10% required. Current starting APR is 6.24% for borrowers with excellent credit (740+ FICO).
+- Pre-payment Penalty: Global Horizon Bank does not charge pre-payment penalties on consumer loans. Borrowers may pay off their principal early to save on interest. 
+
+6. Current Accounts vs. Savings Accounts (Account Comparisons)
+Global Horizon Bank offers both Savings Accounts for wealth accumulation and Current Accounts for high-frequency transactions.
+
+Current Account Details:
+- Purpose: Designed for businesses, sole proprietors, or individuals making a high volume of daily transactions.
+- Interest (APY): Current Accounts do not earn any interest (0.00% APY).
+- Transaction Limits: Unlimited daily deposits and withdrawals. No cap on the number of transactions.
+- Minimum Balance: Requires a higher minimum daily balance of $5,000 to avoid a $30.00 monthly maintenance fee.
+- Overdraft: Includes standard overdraft protection up to $1,000 for qualifying businesses.
+
+Savings Account Details:
+- Purpose: Designed for individuals looking to save money and earn interest over time.
+- Interest (APY): Earns a competitive interest rate (up to 4.25% APY depending on the tier).
+- Transaction Limits: Federal regulations limit certain types of withdrawals and transfers from savings accounts to 6 per month. Exceeding this limit incurs a $10.00 excessive withdrawal fee per transaction.
+- Minimum Balance: Lower barrier to entry, requiring only a $500 minimum balance to avoid fees.
+
+Key Differences Summary:
+If a customer asks for the difference: Savings accounts pay interest but restrict the number of monthly withdrawals. Current accounts pay no interest but allow unlimited daily transactions and are best suited for businesses.
+
+7. Digital Banking and Mobile App Policies
+Global Horizon Bank provides 24/7 access through its secure web portal and mobile application. 
+
+Mobile Check Deposit Limits: 
+- Standard accounts have a daily mobile deposit limit of $2,500 and a rolling 30-day limit of $10,000. 
+- Premium tier accounts have a daily limit of $10,000 and a 30-day limit of $50,000.
+- Funds availability: Checks deposited via mobile app before 8:00 PM Eastern Time on a business day are typically available the next business day. Checks deposited after 8:00 PM or on weekends will be processed the following business day.
+
+Peer-to-Peer (P2P) Transfers:
+- Global Horizon Bank integrates directly with Zelle for domestic P2P transfers.
+- The daily send limit for Zelle is $1,000 for standard accounts and $2,500 for Premium checking.
+- Zelle transactions are final. The bank cannot reverse a Zelle transfer if the customer sent funds to the wrong email address or phone number, unless the recipient's account is suspected of fraud.
+
+Online Bill Pay:
+- The Online Bill Pay service is free for all checking account customers.
+- Customers can schedule one-time or recurring payments. Electronic payments take 1 to 2 business days to post, while paper checks mailed by the bank take 5 to 7 business days.
+
+
+8. Credit Card Products and Rewards Programs
+All credit card applications require a hard credit inquiry. Approval is based on credit history, income, and existing debt obligations.
+
+Product: Cash Rewards Visa Signature
+- Annual Fee: $0
+- Variable APR: 18.24% to 28.99% based on creditworthiness.
+- Rewards Structure: 3% cash back on dining and groceries, 2% on travel, and 1% on all other purchases.
+- Intro Offer: 0% APR on purchases and balance transfers for the first 12 months.
+
+Product: Travel Elite Mastercard
+- Annual Fee: $95 (Waived the first year).
+- Variable APR: 16.99% to 25.99%.
+- Rewards Structure: 5x points on flights and hotels booked through the bank portal, 2x points on dining, 1x points on everything else.
+- Foreign Transaction Fee: $0 (No foreign transaction fees).
+
+Rewards Redemption Policy:
+- Cash back can be redeemed as a statement credit or deposited directly into a Global Horizon Bank checking or savings account. The minimum redemption amount is $25.
+- Travel points do not expire as long as the account remains open and in good standing. If the account is closed by the customer or the bank, all unredeemed points are immediately forfeited.
+
+
+9. Mortgage and Home Equity Products
+The bank offers financing for primary residences, secondary homes, and investment properties.
+
+Fixed-Rate Mortgages:
+- Available in 15-year, 20-year, and 30-year terms.
+- The interest rate remains the same for the entire life of the loan.
+- Minimum down payment is typically 20% to avoid Private Mortgage Insurance (PMI). First-time homebuyers may qualify for a 3% minimum down payment program with mandatory PMI.
+
+Adjustable-Rate Mortgages (ARMs):
+- Available as 5/1, 7/1, and 10/1 ARMs. 
+- The interest rate is fixed for the initial period (5, 7, or 10 years) and then adjusts annually based on the SOFR index plus a predefined margin.
+- Interest rate caps apply to limit how much the rate can increase per year and over the life of the loan.
+
+Home Equity Line of Credit (HELOC):
+- Allows homeowners to borrow against the equity in their home.
+- Variable interest rate tied to the Prime Rate.
+- Draw period is typically 10 years (during which interest-only payments are required), followed by a 15-year repayment period.
+
+
+10. Account Dormancy, Inactivity, and Closure
+To protect customer funds and comply with state laws, accounts are monitored for inactivity.
+
+Inactivity Policy:
+- An account is considered "Inactive" if there has been no customer-initiated transaction (deposit, withdrawal, or transfer) for 365 days. 
+- Automated transactions (like interest posting or recurring fees) do not count as customer activity.
+- An Inactivity Fee of $5.00 per month is charged to inactive checking and savings accounts until the balance reaches zero.
+
+Dormancy and Escheatment:
+- After 3 to 5 years of continuous inactivity (depending on state law), the account is classified as "Dormant."
+- Once an account is dormant, the bank is legally required to turn the funds over to the state government. This process is called "Escheatment."
+- Customers must contact the bank in writing or make a transaction to reactivate a dormant account before escheatment occurs. Once funds are escheated, the customer must claim them directly from the state's unclaimed property division.
+
+Account Closure by Bank:
+- The bank reserves the right to close an account at any time, with or without cause, by mailing a check for the remaining balance to the address on file.
+- Common reasons for bank-initiated closure include excessive overdrafts, suspected fraudulent activity, or abusive behavior toward bank staff.
+
+
+11. Fraud Prevention and Security Standards
+Global Horizon Bank employs bank-level encryption and security measures to protect customer data.
+
+Two-Factor Authentication (2FA):
+- 2FA is mandatory for all digital banking logins. Customers must verify their identity via an SMS code, email code, or biometric scan (Face ID/Fingerprint).
+
+Phishing and Social Engineering:
+- Global Horizon Bank will NEVER contact a customer via phone, email, or text to ask for their password, PIN, or full debit card number.
+- Customers who suspect they have received a phishing email should forward it to spoof@globalhorizonbank.com and immediately change their online banking password.
+
+Zero Liability Protection:
+- Customers are not held responsible for unauthorized transactions made using their lost or stolen debit or credit card, provided the loss is reported promptly.
+- A lost or stolen card must be reported within 2 business days of the customer noticing the loss to ensure maximum protection under federal law.
