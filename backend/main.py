@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.voice import router as voice_router
 from api.tts import router as tts_router
 from api.chat import router as chat_router
+from api.admin import router as admin_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,6 +29,7 @@ app.add_middleware(
 app.include_router(voice_router)
 app.include_router(tts_router)
 app.include_router(chat_router)
+app.include_router(admin_router)
 
 @app.get("/")
 def home():
