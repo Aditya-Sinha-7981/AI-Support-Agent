@@ -264,9 +264,9 @@ The last 8 turns are injected into every LLM prompt. This is what gives the bot 
 
 ### 4. Sentiment Detection
 
-Current implementation uses a lightweight rule/keyword classifier in `agent/sentiment.py`.
-It returns API-contract-aligned values: `positive`, `neutral`, or `frustrated`.
-This keeps latency/cost low and can be swapped to an LLM classifier later without changing WebSocket shapes.
+Current implementation uses a hybrid sentiment classifier in `agent/sentiment.py`.
+It runs local score-based rules first and can optionally use an LLM fallback only for uncertain cases.
+It still returns API-contract-aligned values only: `positive`, `neutral`, or `frustrated`.
 
 This result is:
 1. Sent to the frontend to display the sentiment badge
