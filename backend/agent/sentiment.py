@@ -40,10 +40,14 @@ NEGATIVE_PHRASES = [
     "so bad",
     "very bad",
     "keep failing",
+    "fails every time",
+    "still fails",
     "not resolved",
     "still broken",
     "keeps happening",
     "not good",
+    "too bad",
+    "bad service",
     "so hard",
 ]
 
@@ -72,7 +76,7 @@ POSITIVE_PHRASES = [
     "superb",
 ]
 
-INTENSIFIERS = ["very", "really", "so", "extremely", "totally", "absolutely", "completely"]
+INTENSIFIERS = ["very", "really", "so", "too", "extremely", "totally", "absolutely", "completely"]
 SOFTENERS = ["maybe", "kinda", "slightly", "a bit", "somewhat", "sort of", "kind of"]
 NEGATIONS = [
     "not",
@@ -127,8 +131,11 @@ _NEGATIVE_WORDS = {
     "issue",
     "problem",
     "error",
+    "fail",
+    "fails",
     "failed",
     "failure",
+    "retry",
     "frustrating",
     "frustrated",
     "annoying",
@@ -257,7 +264,17 @@ async def _llm_classify_sentiment(message: str, llm) -> str | None:
     )
     try:
         raw = await asyncio.wait_for(llm.complete(prompt), timeout=3.0)
-        payload = json.loads((raw or "").strip())
+        raw_text = (raw or "").strip()
+        # Models sometimes wrap JSON in prose or code-fences; try to salvage.
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```[a-zA-Z0-9_-]*\s*", "", raw_text)
+            raw_text = re.sub(r"\s*```$", "", raw_text).strip()
+        candidate = raw_text
+        if not candidate.startswith("{"):
+            match = re.search(r"\{[\s\S]*\}", candidate)
+            if match:
+                candidate = match.group(0).strip()
+        payload = json.loads(candidate)
         if isinstance(payload, dict):
             sentiment = str(payload.get("sentiment", "")).strip().lower()
             if sentiment in ALLOWED_SENTIMENTS:
