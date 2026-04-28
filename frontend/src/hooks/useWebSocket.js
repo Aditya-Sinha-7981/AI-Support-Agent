@@ -216,6 +216,7 @@ export function useWebSocket({ domain, sessionId }) {
       return false;
     }
 
+    const now = Date.now();
     const userMessage = {
       id: makeId(),
       role: "user",
@@ -223,7 +224,8 @@ export function useWebSocket({ domain, sessionId }) {
       isComplete: true,
       isStreaming: false,
       sources: [],
-      sentiment: null
+      sentiment: null,
+      timestamp: now
     };
 
     const assistantMessageId = makeId();
@@ -234,7 +236,8 @@ export function useWebSocket({ domain, sessionId }) {
       isComplete: false,
       isStreaming: true,
       sources: [],
-      sentiment: null
+      sentiment: null,
+      timestamp: now
     };
 
     pendingAssistantIdRef.current = assistantMessageId;

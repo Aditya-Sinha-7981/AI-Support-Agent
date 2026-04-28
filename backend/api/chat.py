@@ -2,6 +2,8 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+import time
+
 from agent.escalation import maybe_create_ticket
 from agent.memory import add_turn, clear, get_history
 from agent.router import route
@@ -84,7 +86,7 @@ async def chat(websocket: WebSocket, session_id: str):
 
             # 2. Memory (before pipeline)
             history = get_history(session_id)
-            add_turn(session_id, "user", message)
+            add_turn(session_id, "user", message, meta={"ts": time.time()})
 
             # 3. Pipeline call
             full_response = ""
@@ -162,7 +164,18 @@ async def chat(websocket: WebSocket, session_id: str):
                 await websocket.send_json({"type": "token", "content": fallback})
                 await _send_turn_end(websocket)
 
-            add_turn(session_id, "assistant", full_response)
+            add_turn(
+                session_id,
+                "assistant",
+                full_response,
+                meta={
+                    "ts": time.time(),
+                    "sentiment": pipeline.last_sentiment,
+                    "sources": pipeline.last_sources,
+                    "suggestions": pipeline.last_suggestions,
+                    "ticket": ticket,
+                },
+            )
 
     except WebSocketDisconnect:
         _session_domains.pop(session_id, None)
