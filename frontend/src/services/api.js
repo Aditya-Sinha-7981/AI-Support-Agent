@@ -45,3 +45,21 @@ export async function synthesizeSpeech(text) {
 
   return response.blob();
 }
+
+export async function uploadAdminDocument(domain, file) {
+  const formData = new FormData();
+  formData.append("domain", domain);
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/api/admin/ingest`, {
+    method: "POST",
+    body: formData
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.detail || "Document ingestion request failed.");
+  }
+
+  return payload;
+}
