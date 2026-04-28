@@ -3,6 +3,7 @@ import ChatWindow from "./components/ChatWindow";
 import DomainSwitcher from "./components/DomainSwitcher";
 import SentimentBadge from "./components/SentimentBadge";
 import VoiceInput from "./components/VoiceInput";
+import AdminUploadPanel from "./components/AdminUploadPanel";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { synthesizeSpeech } from "./services/api";
 
@@ -59,9 +60,11 @@ export default function App() {
   const [ttsStatus, setTtsStatus] = useState("idle");
   const voiceSubmitTimerRef = useRef(null);
   const hasUserInteractedRef = useRef(false);
-  const lastSpokenMessageIdRef = useRef(null);
+  const lastSpokenMessageByConversationRef = useRef({});
+  const lastConversationKeyRef = useRef(null);
   const currentAudioRef = useRef(null);
   const activeSessionId = chatState.activeSessionByDomain[domain];
+  const activeConversationKey = `${domain}:${activeSessionId}`;
   const activeThreads = chatState.threadsByDomain[domain];
   const { messages, sentiment, statusText, suggestions, tickets, connectionState, sendMessage } = useWebSocket({
     domain,
@@ -151,6 +154,44 @@ export default function App() {
     setDraft("");
   };
 
+  const handleDeleteChat = (sessionId) => {
+    setChatState((prev) => {
+      const domainThreads = prev.threadsByDomain[domain];
+      const remainingThreads = domainThreads.filter((thread) => thread.id !== sessionId);
+      const isDeletingActive = prev.activeSessionByDomain[domain] === sessionId;
+
+      let nextThreads = remainingThreads;
+      let nextActiveId = prev.activeSessionByDomain[domain];
+
+      if (!nextThreads.length) {
+        const replacementId = makeSessionId();
+        nextThreads = [
+          {
+            id: replacementId,
+            title: `${domain === "banking" ? "Banking" : "Ecommerce"} Chat 1`,
+            updatedAt: Date.now()
+          }
+        ];
+        nextActiveId = replacementId;
+      } else if (isDeletingActive) {
+        nextActiveId = nextThreads[0].id;
+      }
+
+      return {
+        ...prev,
+        activeSessionByDomain: {
+          ...prev.activeSessionByDomain,
+          [domain]: nextActiveId
+        },
+        threadsByDomain: {
+          ...prev.threadsByDomain,
+          [domain]: nextThreads
+        }
+      };
+    });
+    setDraft("");
+  };
+
   const handleVoiceTranscript = (transcript) => {
     hasUserInteractedRef.current = true;
     setDraft(transcript);
@@ -212,8 +253,18 @@ export default function App() {
       .find((message) => message.role === "assistant" && message.isComplete && message.content);
 
     if (!latestCompletedAssistant) return;
+    if (lastConversationKeyRef.current !== activeConversationKey) {
+      lastConversationKeyRef.current = activeConversationKey;
+      lastSpokenMessageByConversationRef.current[activeConversationKey] = latestCompletedAssistant.id;
+      return;
+    }
     if (!hasUserInteractedRef.current) return;
-    if (latestCompletedAssistant.id === lastSpokenMessageIdRef.current) return;
+    if (
+      latestCompletedAssistant.id ===
+      lastSpokenMessageByConversationRef.current[activeConversationKey]
+    ) {
+      return;
+    }
 
     let isCancelled = false;
     let audioUrl = "";
@@ -238,7 +289,8 @@ export default function App() {
         await audio.play();
         if (!isCancelled) {
           setTtsStatus("playing");
-          lastSpokenMessageIdRef.current = latestCompletedAssistant.id;
+          lastSpokenMessageByConversationRef.current[activeConversationKey] =
+            latestCompletedAssistant.id;
         }
       } catch {
         if (!isCancelled) {
@@ -258,7 +310,7 @@ export default function App() {
         URL.revokeObjectURL(audioUrl);
       }
     };
-  }, [messages]);
+  }, [messages, activeConversationKey]);
 
   return (
     <div className="mx-auto flex h-screen max-w-6xl p-3 text-slate-900 dark:text-[#dbdee1] md:p-5">
@@ -300,50 +352,50 @@ export default function App() {
           </div>
         </header>
 
-        <section className="mb-3 rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50 p-3 shadow-sm dark:border-indigo-900/60 dark:from-indigo-950/40 dark:to-violet-950/30">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-indigo-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white dark:bg-indigo-500">
-              Tier 1 Live
-            </span>
-            <span className="rounded-full border border-indigo-300 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
-              Query Rewriting
-            </span>
-            <span className="rounded-full border border-indigo-300 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
-              Live Status
-            </span>
-            <span className="rounded-full border border-indigo-300 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
-              Suggestions
-            </span>
-            <span className="rounded-full border border-indigo-300 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
-              Escalation Tickets
-            </span>
-            <span className="rounded-full border border-indigo-300 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200">
-              Language Match
-            </span>
-          </div>
-        </section>
-
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/70 bg-white/80 p-2 dark:border-[#1e1f22] dark:bg-[#2b2d31]">
           {activeThreads.map((thread) => {
             const isActive = thread.id === activeSessionId;
             return (
-              <button
+              <div
                 key={thread.id}
-                type="button"
-                onClick={() => handleSelectChat(thread.id)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                  isActive
-                    ? "bg-indigo-600 text-white dark:bg-[#5865f2]"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-[#1e1f22] dark:text-[#b5bac1] dark:hover:bg-[#35373c]"
+                className={`group relative rounded-lg pr-5 ${
+                  isActive ? "bg-indigo-600 dark:bg-[#5865f2]" : "bg-slate-100 dark:bg-[#1e1f22]"
                 }`}
               >
-                {thread.title}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectChat(thread.id)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                    isActive
+                      ? "text-white"
+                      : "text-slate-700 hover:bg-slate-200 dark:text-[#b5bac1] dark:hover:bg-[#35373c]"
+                  }`}
+                >
+                  {thread.title}
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleDeleteChat(thread.id);
+                  }}
+                  className={`absolute right-1 top-1/2 -translate-y-1/2 rounded px-1 text-[10px] font-bold transition ${
+                    isActive
+                      ? "text-white/80 hover:bg-white/20 hover:text-white"
+                      : "text-slate-500 hover:bg-slate-200 hover:text-slate-800 dark:text-[#949ba4] dark:hover:bg-[#35373c] dark:hover:text-[#dbdee1]"
+                  }`}
+                  aria-label={`Delete ${thread.title}`}
+                  title="Delete chat"
+                >
+                  ×
+                </button>
+              </div>
             );
           })}
         </div>
 
         <main className="min-h-0 flex-1">
+          <AdminUploadPanel domain={domain} />
           <ChatWindow messages={messages} />
         </main>
 
