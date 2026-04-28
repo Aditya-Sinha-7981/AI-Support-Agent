@@ -442,25 +442,7 @@ export default function App() {
           <div className="mb-3">
             <VoiceInput onTranscript={handleVoiceTranscript} />
           </div>
-          {!!suggestions.length && (
-            <div className="mb-3 rounded-xl border border-indigo-200 bg-indigo-50/60 p-2.5 dark:border-indigo-900/60 dark:bg-indigo-950/25">
-              <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
-                Suggested Next Questions
-              </p>
-              <div className="flex flex-wrap gap-2">
-              {suggestions.map((suggestion, index) => (
-                <button
-                  key={`${suggestion}-${index}`}
-                  type="button"
-                  onClick={() => handleSuggestionClick(suggestion)}
-                  className="rounded-full border border-indigo-300 bg-white px-3 py-1 text-xs font-semibold text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-900/50"
-                >
-                  {suggestion}
-                </button>
-              ))}
-              </div>
-            </div>
-          )}
+          
           <div className="flex items-center gap-3">
             <input
               type="text"
