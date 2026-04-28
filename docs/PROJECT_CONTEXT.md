@@ -237,7 +237,8 @@ def add_turn(session_id: str, role: str, content: str):
 
 ### Sentiment Detection
 
-Current implementation uses a lightweight rule-based classifier for low latency and reliability.
+Current implementation uses a hybrid classifier for low latency and better edge-case quality.
+It scores sentiment locally first and can optionally invoke an LLM fallback only when uncertain.
 It returns API-contract-aligned values only: `positive`, `neutral`, or `frustrated`.
 
 Result is used to:

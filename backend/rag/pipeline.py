@@ -261,6 +261,8 @@ class RAGPipeline:
         self.last_sources: list[dict] = []
         self.last_sentiment = "neutral"
         self.last_suggestions: list[str] = []
+        primary_provider = (settings.LLM_PROVIDER or "gemini").strip().lower()
+        self.llm = get_llm_provider(primary_provider)
 
     async def _rewrite_query(self, message: str, history: list, llm) -> str:
         hist = _format_history(history[-4:])
@@ -307,8 +309,10 @@ class RAGPipeline:
     ) -> AsyncGenerator[str, None]:
         domain = _normalize_domain(domain)
         self.last_sources = []
-        self.last_sentiment = await detect_sentiment(message)
         self.last_suggestions = []
+        primary_provider = (settings.LLM_PROVIDER or "gemini").strip().lower()
+        self.last_sentiment = await detect_sentiment(message, llm=self.llm)
+        llm = self.llm
         logger.info(
             "RAG start domain=%s sentiment=%s msg_chars=%d history_turns=%d",
             domain,
@@ -343,8 +347,6 @@ class RAGPipeline:
                 yield token
             return
 
-        primary_provider = (settings.LLM_PROVIDER or "gemini").strip().lower()
-        llm = get_llm_provider(primary_provider)
         retrieval_query = message.strip()
         if _should_rewrite(message, history):
             try:
