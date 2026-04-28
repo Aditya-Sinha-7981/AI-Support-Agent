@@ -4,6 +4,7 @@ import DomainSwitcher from "./components/DomainSwitcher";
 import SentimentBadge from "./components/SentimentBadge";
 import VoiceInput from "./components/VoiceInput";
 import AdminUploadPanel from "./components/AdminUploadPanel";
+import ExportButton from "./components/ExportButton";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { synthesizeSpeech } from "./services/api";
 
@@ -327,6 +328,10 @@ export default function App() {
 
           <DomainSwitcher activeDomain={domain} onSwitch={handleDomainSwitch} />
           <div className="flex items-center gap-2">
+            
+            {/* HERE IS THE CORRECTLY UPDATED BUTTON */}
+            <ExportButton sessionId={activeSessionId} />
+
             <button
               type="button"
               onClick={handleNewChat}
