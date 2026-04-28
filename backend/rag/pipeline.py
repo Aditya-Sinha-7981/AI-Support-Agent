@@ -283,7 +283,8 @@ class RAGPipeline:
         prompt = (
             "Based on the latest support exchange, suggest 3 short follow-up questions.\n"
             "Return only a JSON array of strings.\n\n"
-            f"Language rule: Return suggestions in {language_hint}. Never switch to English unless the user wrote in English.\n"
+            f"IMPORTANT: You must always write the 3 suggested follow-up questions in {language_hint} "
+            f"Language rule: Return suggestions in {language_hint}. \n"
             f'User message: "{user_message.strip()}"\n'
             f'Assistant reply: "{assistant_reply.strip()}"'
         )
