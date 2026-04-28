@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-001"
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    SENTIMENT_LLM_FALLBACK: bool = False
+    SENTIMENT_LLM_TIMEOUT_SECONDS: float = 3.0
 
     # STT
     STT_PROVIDER: str = "local"
