@@ -1,120 +1,183 @@
 # AI Customer Support Agent
 
-LLM-powered voice + text support agent with RAG, sentiment detection, and multi-domain switching.
+LLM-powered voice + text support agent with RAG, sentiment detection, source citations, escalation, and multi-domain chat.
 
----
+## What Is Implemented
 
-## First Time Setup (Everyone Does This)
+### Backend
+- FastAPI app with CORS and health endpoints.
+- WebSocket chat endpoint with token streaming:
+  - `WS /ws/chat/{session_id}?domain={banking|ecommerce}&tone={neutral|formal|friendly|concise}`
+  - Streams `status` and `token` messages.
+  - Sends `sources`, `confidence`, `sentiment`, optional `suggestions`, optional `ticket`, then `done`.
+- RAG pipeline in `backend/rag/pipeline.py`:
+  - Domain-aware retrieval (`banking`, `ecommerce`) using FAISS.
+  - Confidence scoring from retrieval scores.
+  - Conversation-aware query rewriting for short referential follow-ups.
+  - Tone-controlled responses.
+  - Sentiment detection (`positive`, `neutral`, `frustrated`).
+  - Follow-up suggestion generation.
+  - Response caching and Groq fallback on Gemini quota errors (if configured).
+- Voice/STT endpoint:
+  - `POST /api/voice` accepts `webm/wav` and returns transcript JSON.
+- TTS endpoint:
+  - `POST /api/tts` returns `audio/mpeg`.
+- Admin ingestion endpoint:
+  - `POST /api/admin/ingest` uploads `.pdf/.txt/.md`, ingests to index, refreshes retriever state.
+- Conversation export endpoint:
+  - `GET /api/sessions/{session_id}/export` returns downloadable text audit trail.
+
+### Frontend
+- React + Vite UI with:
+  - Domain switching (`banking`, `ecommerce`).
+  - Per-domain multi-thread chat sessions.
+  - Streaming assistant rendering.
+  - Suggestions and ticket display.
+  - Voice input integration.
+  - Auto TTS playback for completed assistant replies.
+  - Sentiment indicator and connection state display.
+  - Theme toggle and localStorage persistence for theme/chat cache.
+
+### Mock Server
+- `mock_server.py` provides backend-compatible WebSocket and voice API shapes for frontend development.
+
+## Project Structure
+
+```text
+AI-Support-Agent/
+  backend/
+    main.py
+    config.py
+    requirements.txt
+    .env.example
+    api/
+    agent/
+    providers/
+    rag/
+    scripts/
+    data/
+  frontend/
+    src/
+    package.json
+    vite.config.js
+  docs/
+    API_CONTRACT.md
+    CORE.md
+    TEAM.md
+    EXTRAS.md
+    PROJECT_CONTEXT.md
+  mock_server.py
+```
+
+## Setup
+
+### 1) Backend
 
 ```bash
-# 1. Clone and enter repo
-git clone <repo-url>
-cd ai-support-agent
-
-# 2. Create your branch — use your member number
-git checkout -b m2   # change to m1, m2, m3 as appropriate
-
-# 3. Run the structure setup script (once only)
-bash setup_structure.sh
-
-# 4. Backend setup
 cd backend
 python -m venv venv
+```
 
-# Activate — Mac/Linux:
-source venv/bin/activate
-# Activate — Windows:
-venv\Scripts\activate
+Activate venv:
+- Windows (PowerShell): `venv\Scripts\Activate.ps1`
+- Windows (cmd): `venv\Scripts\activate.bat`
+- Mac/Linux: `source venv/bin/activate`
 
-# Install dependencies
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
+```
 
-# 5. Create your env file
+Create env file:
+
+```bash
 cp .env.example .env
-# Open .env and fill in your API keys
 ```
 
----
+Then fill required keys in `.env` (at least `GEMINI_API_KEY`; optionally `GROQ_API_KEY`, `DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY`).
 
-## M3 Note — Your .env Must Have This
-```
-STT_PROVIDER=deepgram
-```
-Never use `STT_PROVIDER=local` on your machine. Whisper won't run well on your hardware.
-
----
-
-## M2 (Frontend) — Running the Mock Server
-
-You don't need the real backend. Run this instead:
+### 2) Frontend
 
 ```bash
-# From repo root
-pip install fastapi uvicorn  # one time only
-uvicorn mock_server:app --reload --port 8000
-```
-
-Then in your frontend `.env` or config:
-```
-VITE_WS_URL=ws://localhost:8000
-VITE_API_URL=http://localhost:8000
-```
-
-When M1 shares an ngrok URL, just swap those two values. Nothing else changes.
-
----
-
-## Running the Real Backend
-
-```bash
-cd backend
-source venv/bin/activate  # or venv\Scripts\activate on Windows
-uvicorn main:app --reload --port 8000
-```
-
-## Running Frontend + Backend Together
-
-```bash
-# Terminal 1 - backend
-cd backend
-source venv/bin/activate  # or venv\Scripts\activate on Windows
-uvicorn main:app --reload --port 8000
-
-# Terminal 2 - frontend
 cd frontend
 npm install
+```
+
+Optional frontend env:
+- `VITE_API_BASE_URL=http://localhost:8000`
+
+If unset, frontend uses same-origin fallback.
+
+## Run
+
+### Real backend + frontend
+
+Terminal 1:
+
+```bash
+cd backend
+# activate venv
+uvicorn main:app --reload --port 8000
+```
+
+Terminal 2:
+
+```bash
+cd frontend
 npm run dev
 ```
 
-Frontend defaults to `http://localhost:8000`.  
-If needed, set `VITE_API_BASE_URL` before running dev server.
+### Frontend with mock backend
 
----
-
-## Daily Git Workflow
+From repo root:
 
 ```bash
-# Start of every session — always do this first
-git pull origin main
-
-# Work on your code
-
-# End of session — always commit before closing
-git add .
-git commit -m "brief description of what you did"
-git push origin yourbranchname   # m1, m2, or m3
+uvicorn mock_server:app --reload --port 8000
 ```
 
-**Never push directly to main. M1 handles all merges into main.**
+## Data Ingestion
 
----
+Before asking domain questions, ingest docs for each domain:
 
-## Docs
+```bash
+cd backend
+# activate venv
+python scripts/ingest_domain.py banking
+python scripts/ingest_domain.py ecommerce
+```
 
-| File | Purpose |
-|---|---|
-| `docs/CORE.md` | Full architecture, stack, build order |
-| `docs/TEAM.md` | Who owns what, timeline |
-| `docs/API_CONTRACT.md` | WebSocket and REST endpoint shapes — sacred |
-| `docs/EXTRAS.md` | Bonus features after core is done |
-| `logs/mx.local.md` | Your personal AI session log — never committed |
+Domain documents live in:
+- `backend/data/documents/banking`
+- `backend/data/documents/ecommerce`
+
+Indexes are written under `backend/data/indexes/`.
+
+## API Quick Reference
+
+- `GET /` - backend status message
+- `GET /health` - health check
+- `WS /ws/chat/{session_id}` - main streaming chat
+- `POST /api/voice` - speech-to-text
+- `POST /api/tts` - text-to-speech
+- `POST /api/admin/ingest` - admin document upload + ingest
+- `GET /api/sessions/{session_id}/export` - export chat transcript
+
+## Test/Utility Scripts
+
+`backend/scripts/` includes:
+- `test_gemini_stream.py`
+- `test_rag_pipeline.py`
+- `test_step3_ws.py`
+- `test_stt_file.py`
+- `test_stt_voice_endpoint.py`
+- `test_tts_endpoint.py`
+- `test_sentiment_detector.py`
+
+## Documentation
+
+- `docs/API_CONTRACT.md` - WebSocket/REST shapes and ordering rules
+- `docs/CORE.md` - architecture and implementation baseline
+- `docs/PROJECT_CONTEXT.md` - project context
+- `docs/TEAM.md` - team ownership/timeline notes
+- `docs/EXTRAS.md` - additional ideas/features
