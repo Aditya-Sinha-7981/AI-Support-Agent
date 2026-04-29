@@ -8,10 +8,12 @@ function getWsHost() {
   return API_BASE_URL.replace(/^https?:\/\//, "");
 }
 
-export function buildChatWsUrl(sessionId, domain) {
+export function buildChatWsUrl(sessionId, domain, tone = "neutral") {
   const protocol = getWsProtocol();
   const host = getWsHost();
-  return `${protocol}://${host}/ws/chat/${sessionId}?domain=${domain}`;
+  return `${protocol}://${host}/ws/chat/${sessionId}?domain=${encodeURIComponent(
+    domain
+  )}&tone=${encodeURIComponent(tone)}`;
 }
 
 export async function sendVoiceAudio(audioBlob) {

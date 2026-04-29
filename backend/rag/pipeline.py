@@ -22,6 +22,34 @@ _DOMAIN_LABEL = {
     "ecommerce": "e-commerce and online retail",
 }
 
+_TONE_PROFILE_PROMPTS = {
+    "neutral": (
+        "Tone profile (MANDATORY): Neutral.\n"
+        "- Be clear, direct, and professional.\n"
+        "- No fluff, no emojis.\n"
+        "- Prefer short paragraphs and simple sentences."
+    ),
+    "formal": (
+        "Tone profile (MANDATORY): Formal.\n"
+        "- Use professional, formal language.\n"
+        "- Avoid contractions (e.g., use 'do not' not 'don't').\n"
+        "- Be precise and thorough, but stay within the provided passages."
+    ),
+    "friendly": (
+        "Tone profile (MANDATORY): Friendly.\n"
+        "- Sound warm and supportive.\n"
+        "- Use simple language.\n"
+        "- You may use a brief friendly opener (e.g., 'Sure —', 'Of course —')."
+    ),
+    "concise": (
+        "Tone profile (MANDATORY): Concise.\n"
+        "- Answer in EXACTLY 1 sentence.\n"
+        "- Maximum 20 words.\n"
+        "- No preamble, no filler, no extra context.\n"
+        "- If the answer is missing in passages, say so in 1 sentence (<= 20 words)."
+    ),
+}
+
 _retrievers: dict[str, Retriever] = {}
 logger = logging.getLogger("ai_support.pipeline")
 
@@ -113,7 +141,9 @@ def _tone_hint(sentiment: str) -> str:
         return "The customer sounds frustrated; be calm, empathetic, and solution-focused."
     if sentiment == "positive":
         return "The customer sounds positive; stay warm and clear."
-    return "Keep a neutral, professional tone."
+    # If sentiment is neutral, do not force a generic tone that can override
+    # the user's selected tone profile.
+    return ""
 
 
 def _detect_language_hint(message: str) -> str:
@@ -249,12 +279,16 @@ def _build_prompt(
     message: str,
     context_blocks: list[str],
     sentiment: str,
+    tone_profile: str,
     confidence_level: str,
     confidence_score: float,
 ) -> str:
     label = _DOMAIN_LABEL.get(domain, "customer support")
     hist = _format_history(history)
-    tone = _tone_hint(sentiment)
+    tone_profile_instruction = _TONE_PROFILE_PROMPTS.get(
+        tone_profile, _TONE_PROFILE_PROMPTS["neutral"]
+    )
+    sentiment_tone_hint = _tone_hint(sentiment)
     language_hint = _detect_language_hint(message)
 
     confidence_line = (
@@ -281,23 +315,30 @@ def _build_prompt(
 
     parts = [
         f"You are a helpful customer support assistant for {label}.",
-        tone,
-        f"Reply language must be exactly: {language_hint}.",
-        "Always respond in the same language as the customer's latest message.",
-        "Do not switch to Hindi unless the customer's message is in Hindi.",
-        "Never ask the customer to switch to English.",
-        "If the user writes in Hindi or any non-English language, your full reply must stay in that language.",
-        "If the language is Telugu, reply only in Telugu.",
-        "If the language is Tamil, reply only in Tamil.",
-        "If the language is Kannada, reply only in Kannada.",
-        "If the language is Malayalam, reply only in Malayalam.",
-        "If knowledge is missing, state that limitation in the same user language.",
-        "Answer using only the provided passages when they contain the answer. "
-        "If the answer is not in the passages, say you do not have that information in the documentation.",
-        "Do not invent account numbers, fees, or policies that are not stated in the passages.",
-        confidence_line,
-        f"\n## Knowledge base excerpts\n{context_section}\n",
     ]
+    if sentiment_tone_hint:
+        parts.append(sentiment_tone_hint)
+    parts.append(tone_profile_instruction)
+    parts.append("You MUST follow the selected tone profile exactly.")
+    parts.extend(
+        [
+            f"Reply language must be exactly: {language_hint}.",
+            "Always respond in the same language as the customer's latest message.",
+            "Do not switch to Hindi unless the customer's message is in Hindi.",
+            "Never ask the customer to switch to English.",
+            "If the user writes in Hindi or any non-English language, your full reply must stay in that language.",
+            "If the language is Telugu, reply only in Telugu.",
+            "If the language is Tamil, reply only in Tamil.",
+            "If the language is Kannada, reply only in Kannada.",
+            "If the language is Malayalam, reply only in Malayalam.",
+            "If knowledge is missing, state that limitation in the same user language.",
+            "Answer using only the provided passages when they contain the answer. "
+            "If the answer is not in the passages, say you do not have that information in the documentation.",
+            "Do not invent account numbers, fees, or policies that are not stated in the passages.",
+            confidence_line,
+            f"\n## Knowledge base excerpts\n{context_section}\n",
+        ]
+    )
     if hist:
         parts.append(f"## Prior conversation\n{hist}\n")
     parts.append(f"## Current customer message\n{message}\n\n## Your reply")
@@ -365,6 +406,7 @@ class RAGPipeline:
         message: str,
         domain: str,
         history: list,
+        tone: str = "neutral",
     ) -> AsyncGenerator[str, None]:
         domain = _normalize_domain(domain)
         self.last_sources = []
@@ -393,7 +435,7 @@ class RAGPipeline:
                 yield token
             return
 
-        cache_key = f"{domain}::{_normalize_message(message)}"
+        cache_key = f"{domain}::{tone}::{_normalize_message(message)}"
         cached = _response_cache.get(cache_key)
         if cached:
             logger.info(
@@ -435,6 +477,7 @@ class RAGPipeline:
             message=message.strip(),
             context_blocks=blocks,
             sentiment=self.last_sentiment,
+            tone_profile=tone,
             confidence_level=self.last_confidence.get("level", "low"),
             confidence_score=float(self.last_confidence.get("score", 0.0)),
         )

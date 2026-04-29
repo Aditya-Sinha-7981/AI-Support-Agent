@@ -12,7 +12,9 @@ isDarkMode,
 onToggleTheme,
 connectionText,
 sentiment,
-ttsStatus
+ttsStatus,
+tone,
+onToneChange
 }) {
 const ttsLabel =
 ttsStatus === "loading"
@@ -78,6 +80,19 @@ animate={{ opacity: 1, y: 0, transition: { duration: 0.3 } }}
     </span>
 
     <SentimentBadge sentiment={sentiment} />
+
+    <select
+      value={tone}
+      onChange={(e) => onToneChange(e.target.value)}
+      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-[#2b2d31] dark:bg-[#1e1f22] dark:text-[#dbdee1] dark:hover:bg-[#35373c]"
+      aria-label="Response tone profile"
+      title="Response tone profile"
+    >
+      <option value="neutral">Neutral</option>
+      <option value="formal">Formal</option>
+      <option value="friendly">Friendly</option>
+      <option value="concise">Concise</option>
+    </select>
 
     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-[#1e1f22] dark:text-[#b5bac1]">
       {ttsLabel}

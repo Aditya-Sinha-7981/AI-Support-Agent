@@ -10,10 +10,11 @@ function makeId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export function useWebSocket({ domain, sessionId }) {
+export function useWebSocket({ domain, sessionId, tone }) {
   const wsRef = useRef(null);
   const pendingAssistantIdRef = useRef(null);
   const conversationCacheRef = useRef(null);
+  const pendingOutboundRef = useRef(null);
   const activeConversationKey = `${domain}:${sessionId}`;
 
   const [messages, setMessages] = useState([]);
@@ -53,12 +54,17 @@ export function useWebSocket({ domain, sessionId }) {
   }, []);
 
   const connect = useCallback(() => {
-    const ws = new WebSocket(buildChatWsUrl(sessionId, domain));
+    const ws = new WebSocket(buildChatWsUrl(sessionId, domain, tone));
     wsRef.current = ws;
     setConnectionState("connecting");
 
     ws.onopen = () => {
       setConnectionState("open");
+      const queued = pendingOutboundRef.current;
+      if (queued) {
+        ws.send(queued);
+        pendingOutboundRef.current = null;
+      }
     };
 
     ws.onclose = () => {
@@ -161,7 +167,7 @@ export function useWebSocket({ domain, sessionId }) {
         });
       }
     };
-  }, [domain, sessionId, finalizePendingAssistantTurn]);
+  }, [domain, sessionId, tone, finalizePendingAssistantTurn]);
 
   const resetConversation = useCallback(() => {
     conversationCacheRef.current.delete(activeConversationKey);
@@ -178,16 +184,18 @@ export function useWebSocket({ domain, sessionId }) {
       wsRef.current.close();
       wsRef.current = null;
     }
+    pendingOutboundRef.current = null;
   }, []);
 
   useEffect(() => {
-    disconnect();
     const cachedConversation = conversationCacheRef.current.get(activeConversationKey);
     if (cachedConversation) {
       setMessages(cachedConversation.messages);
       setSentiment(cachedConversation.sentiment);
       setStatusText(cachedConversation.statusText || "");
-      setSuggestions(Array.isArray(cachedConversation.suggestions) ? cachedConversation.suggestions : []);
+      setSuggestions(
+        Array.isArray(cachedConversation.suggestions) ? cachedConversation.suggestions : []
+      );
       setTickets(Array.isArray(cachedConversation.tickets) ? cachedConversation.tickets : []);
     } else {
       setMessages([]);
@@ -197,12 +205,17 @@ export function useWebSocket({ domain, sessionId }) {
       setTickets([]);
     }
     pendingAssistantIdRef.current = null;
+    pendingOutboundRef.current = null;
+  }, [activeConversationKey]);
+
+  useEffect(() => {
+    disconnect();
     connect();
 
     return () => {
       disconnect();
     };
-  }, [activeConversationKey, connect, disconnect]);
+  }, [domain, sessionId, tone, connect, disconnect]);
 
   useEffect(() => {
     conversationCacheRef.current.set(activeConversationKey, {
@@ -220,49 +233,59 @@ export function useWebSocket({ domain, sessionId }) {
     }
   }, [activeConversationKey, messages, sentiment, statusText, suggestions, tickets]);
 
-  const sendMessage = useCallback((text) => {
-    const trimmed = text.trim();
-    if (
-      !trimmed ||
-      !wsRef.current ||
-      wsRef.current.readyState !== WebSocket.OPEN ||
-      pendingAssistantIdRef.current
-    ) {
-      return false;
-    }
+  const sendMessage = useCallback(
+    (text) => {
+      const trimmed = text.trim();
+      if (!trimmed || pendingAssistantIdRef.current) {
+        return false;
+      }
 
-    const now = Date.now();
-    const userMessage = {
-      id: makeId(),
-      role: "user",
-      content: trimmed,
-      isComplete: true,
-      isStreaming: false,
-      sources: [],
-      sentiment: null,
-      confidence: null,
-      timestamp: now
-    };
+      const now = Date.now();
+      const userMessage = {
+        id: makeId(),
+        role: "user",
+        content: trimmed,
+        isComplete: true,
+        isStreaming: false,
+        sources: [],
+        sentiment: null,
+        confidence: null,
+        timestamp: now
+      };
 
-    const assistantMessageId = makeId();
-    const assistantMessage = {
-      id: assistantMessageId,
-      role: "assistant",
-      content: "",
-      isComplete: false,
-      isStreaming: true,
-      sources: [],
-      sentiment: null,
-      confidence: null,
-      timestamp: now
-    };
+      const assistantMessageId = makeId();
+      const assistantMessage = {
+        id: assistantMessageId,
+        role: "assistant",
+        content: "",
+        isComplete: false,
+        isStreaming: true,
+        sources: [],
+        sentiment: null,
+        confidence: null,
+        timestamp: now
+      };
 
-    pendingAssistantIdRef.current = assistantMessageId;
-    setSuggestions([]);
-    setMessages((prev) => [...prev, userMessage, assistantMessage]);
-    wsRef.current.send(JSON.stringify({ message: trimmed }));
-    return true;
-  }, []);
+      pendingAssistantIdRef.current = assistantMessageId;
+      setSuggestions([]);
+      setMessages((prev) => [...prev, userMessage, assistantMessage]);
+
+      const payload = JSON.stringify({ message: trimmed });
+      const ws = wsRef.current;
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(payload);
+      } else {
+        pendingOutboundRef.current = payload;
+        if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+          connect();
+        }
+      }
+
+      return true;
+    },
+    [connect]
+  );
 
   return {
     messages,
