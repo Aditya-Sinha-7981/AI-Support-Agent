@@ -18,7 +18,7 @@ export default function ChatWindow({ messages }) {
   }
 
   return (
-    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto rounded-2xl border border-slate-200/80 bg-white/75 p-5 shadow-inner dark:border-[#1e1f22] dark:bg-[#313338]">
+    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-2xl border border-slate-200/80 bg-white/75 p-3 shadow-inner dark:border-[#1e1f22] dark:bg-[#313338] md:space-y-4 md:p-5">
       <AnimatePresence initial={false}>
         {messages.map((message) => (
           <motion.div

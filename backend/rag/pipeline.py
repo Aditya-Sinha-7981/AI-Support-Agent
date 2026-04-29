@@ -112,9 +112,9 @@ def _confidence_from_scores(scores: list[float]) -> dict[str, Any]:
     top = clean[:3]
     avg = sum(top) / max(1, len(top))
 
-    if avg > 0.85:
+    if avg >= 0.72:
         level = "high"
-    elif avg >= 0.65:
+    elif avg >= 0.50:
         level = "medium"
     else:
         level = "low"
@@ -296,10 +296,10 @@ def _build_prompt(
         f"(avg score {confidence_score:.2f})."
     )
     if confidence_level == "low":
-        # Keep disclaimer in the customer's language by instructing the model explicitly.
+        # Avoid forcing a disclaimer on every answer when retrieval still has usable context.
         confidence_line += (
-            " Acknowledge uncertainty. Start your answer with a brief disclaimer equivalent to: "
-            "\"I'm not fully certain about this - please verify.\""
+            " Be careful and avoid over-claiming."
+            " Add a brief uncertainty note only if the passages are missing or conflicting."
         )
     elif confidence_level == "medium":
         confidence_line += " Provide the best possible answer, but be slightly cautious."
@@ -463,7 +463,7 @@ class RAGPipeline:
         else:
             logger.info("RAG rewrite skipped domain=%s (heuristic)", domain)
 
-        hits = await retriever.search(retrieval_query, k=4)
+        hits = await retriever.search(retrieval_query, k=6)
         logger.info("RAG retrieved domain=%s hits=%d", domain, len(hits))
         if hits:
             self.last_sources = _sources_from_hits(hits)

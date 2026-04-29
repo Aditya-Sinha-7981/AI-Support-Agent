@@ -24,7 +24,7 @@ return ( <div className="relative inline-flex rounded-lg bg-slate-100/80 p-[3px]
       <button
         key={domain.id}
         onClick={() => onSwitch(domain.id)}
-        className={`relative z-10 flex-1 rounded-md px-4 py-1 text-sm font-semibold transition ${
+        className={`relative z-10 flex-1 rounded-md px-3 py-1 text-sm font-semibold transition sm:px-4 ${
           isActive
             ? "text-white"
             : "text-slate-600 hover:text-slate-900 dark:text-[#b5bac1] dark:hover:text-[#f2f3f5]"
