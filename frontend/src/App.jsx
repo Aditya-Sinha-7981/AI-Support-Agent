@@ -57,6 +57,10 @@ function loadStoredChatState() {
 export default function App() {
   const [domain, setDomain] = useState("banking");
   const [chatState, setChatState] = useState(loadStoredChatState);
+  const [toneByDomain, setToneByDomain] = useState({
+    banking: "neutral",
+    ecommerce: "neutral"
+  });
   const [draft, setDraft] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [ttsStatus, setTtsStatus] = useState("idle");
@@ -69,9 +73,11 @@ export default function App() {
   const activeSessionId = chatState.activeSessionByDomain[domain];
   const activeConversationKey = `${domain}:${activeSessionId}`;
   const activeThreads = chatState.threadsByDomain[domain];
+  const tone = toneByDomain[domain] || "neutral";
   const { messages, sentiment, statusText, suggestions, tickets, connectionState, sendMessage } = useWebSocket({
     domain,
-    sessionId: activeSessionId
+    sessionId: activeSessionId,
+    tone
   });
 
   const connectionText = useMemo(() => {
@@ -359,6 +365,11 @@ export default function App() {
               connectionText={connectionText}
               sentiment={sentiment}
               ttsStatus={ttsStatus}
+              tone={tone}
+              onToneChange={(nextTone) => {
+                const value = nextTone || "neutral";
+                setToneByDomain((prev) => ({ ...prev, [domain]: value }));
+              }}
             />
           </motion.div>
 
