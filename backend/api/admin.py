@@ -4,6 +4,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from config import DOCUMENTS_DIR
 from rag.ingestor import VALID_DOMAINS, ingest_domain
+from rag.pipeline import refresh_domain_state
 
 router = APIRouter()
 
@@ -48,6 +49,7 @@ async def admin_ingest(
 
     try:
         summary = await ingest_domain(normalized_domain)
+        refresh_domain_state(normalized_domain)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {exc}") from exc
 

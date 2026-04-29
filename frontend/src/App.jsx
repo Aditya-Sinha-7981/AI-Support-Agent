@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import ChatWindow from "./components/ChatWindow";
@@ -63,7 +64,7 @@ export default function App() {
   const voiceSubmitTimerRef = useRef(null);
   const hasUserInteractedRef = useRef(false);
   const lastSpokenMessageByConversationRef = useRef({});
-  const lastConversationKeyRef = useRef(null);
+  const conversationActivatedAtRef = useRef(Date.now());
   const currentAudioRef = useRef(null);
   const activeSessionId = chatState.activeSessionByDomain[domain];
   const activeConversationKey = `${domain}:${activeSessionId}`;
@@ -238,6 +239,10 @@ export default function App() {
   }, [chatState]);
 
   useEffect(() => {
+    conversationActivatedAtRef.current = Date.now();
+  }, [activeConversationKey]);
+
+  useEffect(() => {
     return () => {
       if (voiceSubmitTimerRef.current) {
         window.clearTimeout(voiceSubmitTimerRef.current);
@@ -255,11 +260,14 @@ export default function App() {
       .find((message) => message.role === "assistant" && message.isComplete && message.content);
 
     if (!latestCompletedAssistant) return;
-    if (lastConversationKeyRef.current !== activeConversationKey) {
-      lastConversationKeyRef.current = activeConversationKey;
+
+    // Avoid auto-playing cached assistant history when switching/opening conversations.
+    const messageTimestamp = latestCompletedAssistant.timestamp || 0;
+    if (messageTimestamp < conversationActivatedAtRef.current) {
       lastSpokenMessageByConversationRef.current[activeConversationKey] = latestCompletedAssistant.id;
       return;
     }
+
     if (!hasUserInteractedRef.current) return;
     if (
       latestCompletedAssistant.id ===
@@ -334,7 +342,12 @@ export default function App() {
     <div className="mx-auto flex h-screen max-w-6xl p-3 text-slate-900 dark:text-[#dbdee1] md:p-5">
       <IntroScreen isVisible={showIntro} onDone={() => setShowIntro(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <motion.div variants={uiVariants} initial="hidden" animate={showIntro ? "hidden" : "show"}>
+        <motion.div
+          variants={uiVariants}
+          initial="hidden"
+          animate={showIntro ? "hidden" : "show"}
+          className="flex h-full min-h-0 flex-col"
+        >
           <motion.div variants={itemVariants}>
             <TopBar
               domain={domain}
@@ -407,7 +420,7 @@ export default function App() {
             </motion.div>
           </motion.div>
 
-          <motion.main variants={itemVariants} className="min-h-0 flex-1">
+          <motion.main variants={itemVariants} className="flex min-h-0 flex-1 flex-col">
             <AdminUploadPanel domain={domain} />
             <ChatWindow messages={messages} />
           </motion.main>

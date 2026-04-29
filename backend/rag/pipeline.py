@@ -41,6 +41,16 @@ def _get_retriever(domain: str) -> Retriever:
     return r
 
 
+def refresh_domain_state(domain: str) -> None:
+    """Clear stale domain cache and force retriever to read fresh index files."""
+    normalized = _normalize_domain(domain)
+    _response_cache.clear_prefix(f"{normalized}::")
+
+    retriever = _retrievers.get(normalized)
+    if retriever is not None:
+        retriever.force_reload()
+
+
 def _normalize_domain(domain: str) -> str:
     d = (domain or "banking").strip().lower()
     return d if d in VALID_DOMAINS else "banking"
@@ -184,6 +194,11 @@ class _LruTtlCache:
         while len(self._items) > self._capacity:
             self._items.popitem(last=False)
 
+    def clear_prefix(self, prefix: str) -> None:
+        keys = [key for key in list(self._items.keys()) if key.startswith(prefix)]
+        for key in keys:
+            self._items.pop(key, None)
+
 
 _response_cache = _LruTtlCache(capacity=64, ttl_seconds=900.0)
 
@@ -283,7 +298,8 @@ class RAGPipeline:
         prompt = (
             "Based on the latest support exchange, suggest 3 short follow-up questions.\n"
             "Return only a JSON array of strings.\n\n"
-            f"Language rule: Return suggestions in {language_hint}. Never switch to English unless the user wrote in English.\n"
+            f"IMPORTANT: You must always write the 3 suggested follow-up questions in {language_hint} "
+            f"Language rule: Return suggestions in {language_hint}. \n"
             f'User message: "{user_message.strip()}"\n'
             f'Assistant reply: "{assistant_reply.strip()}"'
         )
@@ -343,8 +359,10 @@ class RAGPipeline:
             )
             self.last_sources = list(cached.get("sources", []))
             self.last_suggestions = list(cached.get("suggestions", []))
-            for token in cached.get("tokens", []):
-                yield token
+
+            full_cached_text = "".join(cached.get("tokens", []))
+            yield full_cached_text
+
             return
 
         retrieval_query = message.strip()
