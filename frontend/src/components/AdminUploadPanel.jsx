@@ -40,7 +40,7 @@ export default function AdminUploadPanel({ domain }) {
   };
 
   return (
-    <section className="mb-3 rounded-xl border border-emerald-300 bg-emerald-50/70 p-3 shadow-sm dark:border-emerald-800/70 dark:bg-emerald-950/20">
+    <section className="mb-2 shrink-0 rounded-xl border border-emerald-300 bg-emerald-50/70 p-2.5 shadow-sm dark:border-emerald-800/70 dark:bg-emerald-950/20 md:mb-3 md:p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-xs font-bold uppercase tracking-wide text-emerald-900 dark:text-emerald-200">
           Admin Document Upload
@@ -57,7 +57,7 @@ export default function AdminUploadPanel({ domain }) {
         }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        className={`rounded-lg border-2 border-dashed p-4 text-center transition ${
+        className={`rounded-lg border-2 border-dashed p-3 text-center transition md:p-4 ${
           isDragging
             ? "border-emerald-500 bg-emerald-100/80 dark:border-emerald-400 dark:bg-emerald-900/30"
             : "border-emerald-300 bg-white dark:border-emerald-800 dark:bg-[#2b2d31]"
