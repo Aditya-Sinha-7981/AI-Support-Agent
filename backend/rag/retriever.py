@@ -63,6 +63,14 @@ class Retriever:
             self.load()
             self._index_mtime = mtime
 
+    def force_reload(self) -> None:
+        """Reload index + metadata immediately after ingestion updates."""
+        self.load()
+        if self.is_available():
+            self._index_mtime = self.index_path.stat().st_mtime
+        else:
+            self._index_mtime = None
+
     async def search(self, query: str, k: int = DEFAULT_TOP_K) -> list[dict[str, Any]]:
         self.ensure_loaded()
         if self._index is None or self._index.ntotal == 0:

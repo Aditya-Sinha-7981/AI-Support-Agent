@@ -41,6 +41,16 @@ def _get_retriever(domain: str) -> Retriever:
     return r
 
 
+def refresh_domain_state(domain: str) -> None:
+    """Clear stale domain cache and force retriever to read fresh index files."""
+    normalized = _normalize_domain(domain)
+    _response_cache.clear_prefix(f"{normalized}::")
+
+    retriever = _retrievers.get(normalized)
+    if retriever is not None:
+        retriever.force_reload()
+
+
 def _normalize_domain(domain: str) -> str:
     d = (domain or "banking").strip().lower()
     return d if d in VALID_DOMAINS else "banking"
@@ -207,6 +217,11 @@ class _LruTtlCache:
         self._items[key] = (time.monotonic(), value)
         while len(self._items) > self._capacity:
             self._items.popitem(last=False)
+
+    def clear_prefix(self, prefix: str) -> None:
+        keys = [key for key in list(self._items.keys()) if key.startswith(prefix)]
+        for key in keys:
+            self._items.pop(key, None)
 
 
 _response_cache = _LruTtlCache(capacity=64, ttl_seconds=900.0)
