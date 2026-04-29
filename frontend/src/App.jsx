@@ -345,132 +345,139 @@ export default function App() {
   );
 
   return (
-    <div className="mx-auto flex h-screen max-w-6xl p-3 text-slate-900 dark:text-[#dbdee1] md:p-5">
+    <div className="mx-auto flex h-[100dvh] max-w-6xl overflow-hidden p-2 text-slate-900 dark:text-[#dbdee1] md:p-5">
       <IntroScreen isVisible={showIntro} onDone={() => setShowIntro(false)} />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <motion.div
           variants={uiVariants}
           initial="hidden"
           animate={showIntro ? "hidden" : "show"}
-          className="flex h-full min-h-0 flex-col"
+          className="flex h-full min-h-0 flex-col overflow-hidden"
         >
-          <motion.div variants={itemVariants}>
-            <TopBar
-              domain={domain}
-              activeSessionId={activeSessionId}
-              onDomainSwitch={handleDomainSwitch}
-              onNewChat={handleNewChat}
-              isDarkMode={isDarkMode}
-              onToggleTheme={() => setIsDarkMode((prev) => !prev)}
-              connectionText={connectionText}
-              sentiment={sentiment}
-              ttsStatus={ttsStatus}
-              tone={tone}
-              onToneChange={(nextTone) => {
-                const value = nextTone || "neutral";
-                setToneByDomain((prev) => ({ ...prev, [domain]: value }));
-              }}
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <motion.div
-              className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/70 bg-white/80 p-2 dark:border-[#1e1f22] dark:bg-[#2b2d31]"
-              initial="hidden"
-              animate="show"
-              variants={{
-                hidden: { opacity: 0, y: 10 },
-                show: { opacity: 1, y: 0, transition: { staggerChildren: 0.04 } }
-              }}
-            >
-              <AnimatePresence initial={false}>
-                {activeThreads.map((thread) => {
-                  const isActive = thread.id === activeSessionId;
-                  return (
-                    <motion.div
-                      key={thread.id}
-                      layout
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0, transition: { duration: 0.18 } }}
-                      exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
-                      className={`group relative rounded-lg pr-5 ${
-                        isActive ? "bg-indigo-600 dark:bg-[#5865f2]" : "bg-slate-100 dark:bg-[#1e1f22]"
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleSelectChat(thread.id)}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                          isActive
-                            ? "text-white"
-                            : "text-slate-700 hover:bg-slate-200 dark:text-[#b5bac1] dark:hover:bg-[#35373c]"
-                        }`}
-                      >
-                        {thread.title}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleDeleteChat(thread.id);
-                        }}
-                        className={`absolute right-1 top-1/2 -translate-y-1/2 rounded px-1 text-[10px] font-bold transition ${
-                          isActive
-                            ? "text-white/80 hover:bg-white/20 hover:text-white"
-                            : "text-slate-500 hover:bg-slate-200 hover:text-slate-800 dark:text-[#949ba4] dark:hover:bg-[#35373c] dark:hover:text-[#dbdee1]"
-                        }`}
-                        aria-label={`Delete ${thread.title}`}
-                        title="Delete chat"
-                      >
-                        ×
-                      </button>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            <motion.div variants={itemVariants} className="shrink-0">
+              <TopBar
+                domain={domain}
+                activeSessionId={activeSessionId}
+                onDomainSwitch={handleDomainSwitch}
+                onNewChat={handleNewChat}
+                isDarkMode={isDarkMode}
+                onToggleTheme={() => setIsDarkMode((prev) => !prev)}
+                connectionText={connectionText}
+                sentiment={sentiment}
+                ttsStatus={ttsStatus}
+                tone={tone}
+                onToneChange={(nextTone) => {
+                  const value = nextTone || "neutral";
+                  setToneByDomain((prev) => ({ ...prev, [domain]: value }));
+                }}
+              />
             </motion.div>
-          </motion.div>
 
-          <motion.main variants={itemVariants} className="flex min-h-0 flex-1 flex-col">
-            <AdminUploadPanel domain={domain} />
-            <ChatWindow messages={messages} />
-          </motion.main>
-
-          <AnimatePresence initial={false}>
-            {!!tickets.length && (
-              <motion.section
-                key="tickets"
-                variants={itemVariants}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0, transition: { duration: 0.22, ease: "easeOut" } }}
-                exit={{ opacity: 0, y: -8, transition: { duration: 0.14 } }}
-                className="mt-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-700 dark:bg-amber-950/25"
+            <motion.div variants={itemVariants} className="shrink-0">
+              <motion.div
+                className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/70 bg-white/80 p-2 dark:border-[#1e1f22] dark:bg-[#2b2d31]"
+                initial="hidden"
+                animate="show"
+                variants={{
+                  hidden: { opacity: 0, y: 10 },
+                  show: { opacity: 1, y: 0, transition: { staggerChildren: 0.04 } }
+                }}
               >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-xs font-bold uppercase tracking-wide text-amber-900 dark:text-amber-200">
-                    Escalated Tickets
-                  </p>
-                  <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-800/60 dark:text-amber-100">
-                    {tickets.length} ACTIVE
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  {tickets.map((ticket) => (
-                    <div
-                      key={ticket.ticket_id}
-                      className="rounded-lg border border-amber-300/80 bg-white px-3 py-2 text-xs text-amber-900 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-100"
-                    >
-                      <span className="font-semibold">#{ticket.ticket_id}</span>
-                      <span className="mx-2">•</span>
-                      <span>{ticket.summary}</span>
-                    </div>
-                  ))}
-                </div>
-              </motion.section>
-            )}
-          </AnimatePresence>
+                <AnimatePresence initial={false}>
+                  {activeThreads.map((thread) => {
+                    const isActive = thread.id === activeSessionId;
+                    return (
+                      <motion.div
+                        key={thread.id}
+                        layout
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0, transition: { duration: 0.18 } }}
+                        exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+                        className={`group relative rounded-lg pr-5 ${
+                          isActive ? "bg-indigo-600 dark:bg-[#5865f2]" : "bg-slate-100 dark:bg-[#1e1f22]"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleSelectChat(thread.id)}
+                          className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                            isActive
+                              ? "text-white"
+                              : "text-slate-700 hover:bg-slate-200 dark:text-[#b5bac1] dark:hover:bg-[#35373c]"
+                          }`}
+                        >
+                          {thread.title}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDeleteChat(thread.id);
+                          }}
+                          className={`absolute right-1 top-1/2 -translate-y-1/2 rounded px-1 text-[10px] font-bold transition ${
+                            isActive
+                              ? "text-white/80 hover:bg-white/20 hover:text-white"
+                              : "text-slate-500 hover:bg-slate-200 hover:text-slate-800 dark:text-[#949ba4] dark:hover:bg-[#35373c] dark:hover:text-[#dbdee1]"
+                          }`}
+                          aria-label={`Delete ${thread.title}`}
+                          title="Delete chat"
+                        >
+                          ×
+                        </button>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </motion.div>
+            </motion.div>
 
-          <motion.div variants={itemVariants}>
+            <motion.main
+              variants={itemVariants}
+              className="flex min-h-[42dvh] flex-1 flex-col overflow-hidden md:min-h-0"
+            >
+              <AdminUploadPanel domain={domain} />
+              <div className="min-h-[28dvh] flex-1 md:min-h-0">
+                <ChatWindow messages={messages} />
+              </div>
+            </motion.main>
+
+            <AnimatePresence initial={false}>
+              {!!tickets.length && (
+                <motion.section
+                  key="tickets"
+                  variants={itemVariants}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0, transition: { duration: 0.22, ease: "easeOut" } }}
+                  exit={{ opacity: 0, y: -8, transition: { duration: 0.14 } }}
+                  className="mt-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-700 dark:bg-amber-950/25"
+                >
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-amber-900 dark:text-amber-200">
+                      Escalated Tickets
+                    </p>
+                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-800/60 dark:text-amber-100">
+                      {tickets.length} ACTIVE
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {tickets.map((ticket) => (
+                      <div
+                        key={ticket.ticket_id}
+                        className="rounded-lg border border-amber-300/80 bg-white px-3 py-2 text-xs text-amber-900 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-100"
+                      >
+                        <span className="font-semibold">#{ticket.ticket_id}</span>
+                        <span className="mx-2">•</span>
+                        <span>{ticket.summary}</span>
+                      </div>
+                    ))}
+                  </div>
+                </motion.section>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <motion.div variants={itemVariants} className="shrink-0 pb-[max(0.4rem,env(safe-area-inset-bottom))]">
             <InputBar
               domain={domain}
               draft={draft}
