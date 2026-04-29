@@ -35,6 +35,33 @@ export default function MessageBubble({ message }) {
   const isUser = message.role === "user";
   const showCursor = !isUser && message.isStreaming;
   const timeStr = formatTime(message.timestamp);
+  const confidence = message.confidence;
+  const level = confidence?.level;
+
+  const confidenceStyles = (() => {
+    if (level === "high") {
+      return {
+        dot: "bg-emerald-500",
+        pillBg: "bg-emerald-500/10",
+        pillText: "text-emerald-700 dark:text-[#59e3a8]",
+      };
+    }
+    if (level === "medium") {
+      return {
+        dot: "bg-amber-500",
+        pillBg: "bg-amber-500/10",
+        pillText: "text-amber-700 dark:text-[#f0c56a]",
+      };
+    }
+    if (level === "low") {
+      return {
+        dot: "bg-yellow-500",
+        pillBg: "bg-yellow-500/10",
+        pillText: "text-yellow-800 dark:text-[#f1d36b]",
+      };
+    }
+    return null;
+  })();
 
   return (
     <div className={`flex gap-2 ${isUser ? "justify-end" : "justify-start"}`}>
@@ -46,9 +73,35 @@ export default function MessageBubble({ message }) {
         }`}
       >
         <div className="flex items-center justify-between gap-2 mb-1">
-          <p className={`text-[11px] font-semibold ${isUser ? "text-indigo-100" : "text-slate-500 dark:text-[#949ba4]"}`}>
-            {isUser ? "You" : "Assistant"}
-          </p>
+          <div className="flex items-center gap-2">
+            <p
+              className={`text-[11px] font-semibold ${
+                isUser
+                  ? "text-indigo-100"
+                  : "text-slate-500 dark:text-[#949ba4]"
+              }`}
+            >
+              {isUser ? "You" : "Assistant"}
+            </p>
+            {!isUser && confidenceStyles && (
+              <div
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${confidenceStyles.pillBg} ${confidenceStyles.pillText}`}
+                title={
+                  typeof confidence?.score === "number"
+                    ? `Confidence score: ${confidence.score.toFixed(2)}`
+                    : "Confidence"
+                }
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${confidenceStyles.dot}`} />
+                <span className="text-[10px] font-semibold capitalize">
+                  {level}
+                  {typeof confidence?.score === "number"
+                    ? ` (${confidence.score.toFixed(2)})`
+                    : ""}
+                </span>
+              </div>
+            )}
+          </div>
           {timeStr && (
             <p className={`text-[10px] ${isUser ? "text-indigo-200/60" : "text-slate-400 dark:text-[#6d7680]"}`}>
               {timeStr}

@@ -21,11 +21,13 @@ async def _send_turn_end(
     websocket: WebSocket,
     *,
     sources: list | None = None,
+    confidence: dict | None = None,
     sentiment: str = "neutral",
     suggestions: list[str] | None = None,
     ticket: dict | None = None,
 ) -> None:
     await websocket.send_json({"type": "sources", "content": sources or []})
+    await websocket.send_json({"type": "confidence", "content": confidence or {"score": 0.0, "level": "low"}})
     await websocket.send_json({"type": "sentiment", "content": sentiment})
     if suggestions:
         await websocket.send_json({"type": "suggestions", "content": suggestions})
@@ -133,6 +135,7 @@ async def chat(websocket: WebSocket, session_id: str):
                 await _send_turn_end(
                     websocket,
                     sources=pipeline.last_sources,
+                    confidence=pipeline.last_confidence,
                     sentiment=pipeline.last_sentiment,
                     suggestions=pipeline.last_suggestions,
                     ticket=ticket,
@@ -176,6 +179,7 @@ async def chat(websocket: WebSocket, session_id: str):
                     "ts": time.time(),
                     "sentiment": pipeline.last_sentiment,
                     "sources": pipeline.last_sources,
+                    "confidence": pipeline.last_confidence,
                     "suggestions": pipeline.last_suggestions,
                     "ticket": ticket,
                 },

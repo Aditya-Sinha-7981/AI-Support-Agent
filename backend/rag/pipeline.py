@@ -98,6 +98,30 @@ def _sources_from_hits(hits: list[dict]) -> list[dict]:
     return out
 
 
+def _confidence_from_scores(scores: list[float]) -> dict[str, Any]:
+    """
+    Confidence = average of top-3 similarity scores.
+    FAISS scores come from inner product on normalized vectors (cosine similarity).
+    """
+    clean = [float(s) for s in scores if s is not None]
+    if not clean:
+        return {"score": 0.0, "level": "low"}
+
+    # Keep the top-3 strongest matches (higher is better for IndexFlatIP).
+    clean.sort(reverse=True)
+    top = clean[:3]
+    avg = sum(top) / max(1, len(top))
+
+    if avg > 0.85:
+        level = "high"
+    elif avg >= 0.65:
+        level = "medium"
+    else:
+        level = "low"
+
+    return {"score": avg, "level": level}
+
+
 def _format_history(history: list) -> str:
     lines: list[str] = []
     for turn in history:
@@ -256,6 +280,8 @@ def _build_prompt(
     context_blocks: list[str],
     sentiment: str,
     tone_profile: str,
+    confidence_level: str,
+    confidence_score: float,
 ) -> str:
     label = _DOMAIN_LABEL.get(domain, "customer support")
     hist = _format_history(history)
@@ -264,6 +290,21 @@ def _build_prompt(
     )
     sentiment_tone_hint = _tone_hint(sentiment)
     language_hint = _detect_language_hint(message)
+
+    confidence_line = (
+        f"Confidence in retrieved context: {confidence_level.upper()} "
+        f"(avg score {confidence_score:.2f})."
+    )
+    if confidence_level == "low":
+        # Keep disclaimer in the customer's language by instructing the model explicitly.
+        confidence_line += (
+            " Acknowledge uncertainty. Start your answer with a brief disclaimer equivalent to: "
+            "\"I'm not fully certain about this - please verify.\""
+        )
+    elif confidence_level == "medium":
+        confidence_line += " Provide the best possible answer, but be slightly cautious."
+    else:
+        confidence_line += " Provide a straightforward answer using the provided passages."
 
     context_section = "\n\n---\n\n".join(
         f"[Passage {i + 1}]\n{t}" for i, t in enumerate(context_blocks)
@@ -294,6 +335,7 @@ def _build_prompt(
             "Answer using only the provided passages when they contain the answer. "
             "If the answer is not in the passages, say you do not have that information in the documentation.",
             "Do not invent account numbers, fees, or policies that are not stated in the passages.",
+            confidence_line,
             f"\n## Knowledge base excerpts\n{context_section}\n",
         ]
     )
@@ -317,6 +359,7 @@ class RAGPipeline:
         self.last_sources: list[dict] = []
         self.last_sentiment = "neutral"
         self.last_suggestions: list[str] = []
+        self.last_confidence: dict[str, Any] = {"score": 0.0, "level": "low"}
         primary_provider = (settings.LLM_PROVIDER or "gemini").strip().lower()
         self.llm = get_llm_provider(primary_provider)
 
@@ -368,6 +411,7 @@ class RAGPipeline:
         domain = _normalize_domain(domain)
         self.last_sources = []
         self.last_suggestions = []
+        self.last_confidence = {"score": 0.0, "level": "low"}
         primary_provider = (settings.LLM_PROVIDER or "gemini").strip().lower()
         self.last_sentiment = await detect_sentiment(message, llm=self.llm)
         llm = self.llm
@@ -401,6 +445,8 @@ class RAGPipeline:
             )
             self.last_sources = list(cached.get("sources", []))
             self.last_suggestions = list(cached.get("suggestions", []))
+            if isinstance(cached.get("confidence"), dict):
+                self.last_confidence = cached["confidence"]
 
             full_cached_text = "".join(cached.get("tokens", []))
             yield full_cached_text
@@ -421,6 +467,9 @@ class RAGPipeline:
         logger.info("RAG retrieved domain=%s hits=%d", domain, len(hits))
         if hits:
             self.last_sources = _sources_from_hits(hits)
+        self.last_confidence = _confidence_from_scores(
+            [h.get("score") for h in hits if isinstance(h, dict)]
+        )
         blocks = [h.get("text", "").strip() for h in hits if h.get("text")]
         prompt = _build_prompt(
             domain=domain,
@@ -429,6 +478,8 @@ class RAGPipeline:
             context_blocks=blocks,
             sentiment=self.last_sentiment,
             tone_profile=tone,
+            confidence_level=self.last_confidence.get("level", "low"),
+            confidence_score=float(self.last_confidence.get("score", 0.0)),
         )
         logger.info("RAG prompt domain=%s prompt_chars=%d", domain, len(prompt))
 
@@ -515,6 +566,7 @@ class RAGPipeline:
                 "tokens": list(stream_tokens),
                 "sources": list(self.last_sources),
                 "suggestions": list(self.last_suggestions),
+                "confidence": dict(self.last_confidence),
             },
         )
 
