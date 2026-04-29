@@ -1,17 +1,9 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-
-function getWsProtocol() {
-  return API_BASE_URL.startsWith("https://") ? "wss" : "ws";
-}
-
-function getWsHost() {
-  return API_BASE_URL.replace(/^https?:\/\//, "");
-}
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 export function buildChatWsUrl(sessionId, domain, tone = "neutral") {
-  const protocol = getWsProtocol();
-  const host = getWsHost();
-  return `${protocol}://${host}/ws/chat/${sessionId}?domain=${encodeURIComponent(
+  const url = new URL(API_BASE_URL || window.location.origin);
+  const protocol = url.protocol === "https:" ? "wss" : "ws";
+  return `${protocol}://${url.host}/ws/chat/${sessionId}?domain=${encodeURIComponent(
     domain
   )}&tone=${encodeURIComponent(tone)}`;
 }
