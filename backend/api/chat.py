@@ -13,6 +13,7 @@ router = APIRouter()
 logger = logging.getLogger("ai_support.chat")
 
 VALID_DOMAINS = {"banking", "ecommerce"}
+VALID_TONES = {"neutral", "formal", "friendly", "concise"}
 _session_domains: dict[str, str] = {}
 
 
@@ -89,6 +90,9 @@ async def chat(websocket: WebSocket, session_id: str):
             add_turn(session_id, "user", message, meta={"ts": time.time()})
 
             # 3. Pipeline call
+            tone = websocket.query_params.get("tone", "neutral").strip().lower()
+            if tone not in VALID_TONES:
+                tone = "neutral"
             full_response = ""
             token_count = 0
             ticket: dict | None = None
@@ -97,7 +101,7 @@ async def chat(websocket: WebSocket, session_id: str):
                     {"type": "status", "content": "Searching knowledge base..."}
                 )
                 sent_generating_status = False
-                async for token in pipeline.query(message, domain, history):
+                async for token in pipeline.query(message, domain, history, tone=tone):
                     if not sent_generating_status:
                         await websocket.send_json(
                             {"type": "status", "content": "Generating response..."}
