@@ -124,6 +124,21 @@ export function useWebSocket({ domain, sessionId }) {
         return;
       }
 
+      if (payload.type === "confidence") {
+        const confidence = payload.content || null;
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === pendingAssistantIdRef.current
+              ? {
+                  ...message,
+                  confidence
+                }
+              : message
+          )
+        );
+        return;
+      }
+
       if (payload.type === "done") {
         setStatusText("");
         finalizePendingAssistantTurn();
@@ -225,6 +240,7 @@ export function useWebSocket({ domain, sessionId }) {
       isStreaming: false,
       sources: [],
       sentiment: null,
+      confidence: null,
       timestamp: now
     };
 
@@ -237,6 +253,7 @@ export function useWebSocket({ domain, sessionId }) {
       isStreaming: true,
       sources: [],
       sentiment: null,
+      confidence: null,
       timestamp: now
     };
 

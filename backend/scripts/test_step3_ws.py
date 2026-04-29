@@ -40,14 +40,23 @@ def _assert_event_order(events: list[dict]) -> None:
 
     try:
         first_sources = event_types.index("sources")
+        first_confidence = event_types.index("confidence")
         first_sentiment = event_types.index("sentiment")
         done_idx = event_types.index("done")
     except ValueError as exc:
         raise AssertionError(f"Missing required terminal event: {exc}") from exc
 
-    if not (first_sources < first_sentiment < done_idx):
+    if not (first_sources < first_confidence < first_sentiment < done_idx):
         raise AssertionError(
-            "Invalid event order. Expected token* -> sources -> sentiment -> done."
+            "Invalid event order. Expected token* -> sources -> confidence -> sentiment -> done."
+        )
+
+    # Anything between sources and sentiment must be confidence only.
+    between = event_types[first_sources + 1 : first_sentiment]
+    invalid_between = [t for t in between if t not in {"confidence"}]
+    if invalid_between:
+        raise AssertionError(
+            f"Invalid event order between sources and sentiment. Got: {invalid_between}"
         )
 
     token_count = sum(1 for t in event_types[:first_sources] if t == "token")

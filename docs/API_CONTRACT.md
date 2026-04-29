@@ -21,13 +21,14 @@ WS /ws/chat/{session_id}?domain={banking|ecommerce}
 | `status` *(optional)* | During processing (Tier 1 UX) | `{ "type": "status", "content": "Searching knowledge base..." }` |
 | `token` | During streaming, one per chunk | `{ "type": "token", "content": "..." }` |
 | `sources` | After stream ends | `{ "type": "sources", "content": [{ "file": "policy.pdf", "page": 4 }] }` |
-| `sentiment` | After sources | `{ "type": "sentiment", "content": "neutral" }` |
+| `confidence` | After `sources`, before `sentiment` | `{ "type": "confidence", "content": { "score": 0.72, "level": "medium" } }` |
+| `sentiment` | After `confidence` | `{ "type": "sentiment", "content": "neutral" }` |
 | `suggestions` *(optional)* | After sentiment, before done | `{ "type": "suggestions", "content": ["...", "..."] }` |
 | `ticket` *(optional)* | After sentiment, before done | `{ "type": "ticket", "content": { "ticket_id": "1042", "status": "open" } }` |
 | `done` | Last message of every turn | `{ "type": "done" }` |
 
 **Ordering rules:**
-- Required terminal sequence remains: `sources -> sentiment -> done`
+- Required terminal sequence remains: `sources -> confidence -> sentiment -> done`
 - `status` may appear before or during token streaming
 - `suggestions`/`ticket` may appear only after `sentiment` and before `done`
 
@@ -53,6 +54,7 @@ Server → { "type": "token",     "content": "refund " }
 Server → { "type": "token",     "content": "policy " }
 Server → { "type": "token",     "content": "allows..." }
 Server → { "type": "sources",   "content": [{ "file": "return_policy.pdf", "page": 4 }] }
+Server → { "type": "confidence", "content": { "score": 0.72, "level": "medium" } }
 Server → { "type": "sentiment", "content": "neutral" }
 Server → { "type": "done" }
 ```
@@ -98,7 +100,7 @@ async def query(
     history: list       # list of {"role": "user"|"assistant", "content": str}
 ) -> AsyncGenerator[str, None]:
     # yields string tokens one by one
-    # after iteration: access .sources and .sentiment on the pipeline object
+    # after iteration: access .sources, .confidence, and .sentiment on the pipeline object
 ```
 
 ### Usage in WebSocket handler
@@ -107,6 +109,7 @@ async for token in pipeline.query(message, domain, history):
     await websocket.send_json({"type": "token", "content": token})
 
 await websocket.send_json({"type": "sources",   "content": pipeline.last_sources})
+await websocket.send_json({"type": "confidence", "content": pipeline.last_confidence})
 await websocket.send_json({"type": "sentiment", "content": pipeline.last_sentiment})
 await websocket.send_json({"type": "done"})
 ```

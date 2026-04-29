@@ -55,6 +55,21 @@ async def mock_chat(websocket: WebSocket, session_id: str):
             ]
         })
 
+        # Confidence — simulate FAISS similarity score aggregation (top-3 average).
+        mock_score = 0.95 - (len(message) % 10) * 0.05
+        if mock_score > 1.0:
+            mock_score = 1.0
+        if mock_score > 0.85:
+            mock_level = "high"
+        elif mock_score >= 0.65:
+            mock_level = "medium"
+        else:
+            mock_level = "low"
+        await websocket.send_json({
+            "type": "confidence",
+            "content": {"score": round(mock_score, 2), "level": mock_level},
+        })
+
         # Sentiment — cycles through values so M2 can test all badge states
         sentiments = ["neutral", "positive", "frustrated"]
         mock_sentiment = sentiments[len(message) % 3]
